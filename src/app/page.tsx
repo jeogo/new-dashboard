@@ -1,101 +1,200 @@
-import Image from "next/image";
+// src/app/page.tsx
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { apiClient } from "./utils/apiClient"; // Import the API client
+import { Bar, Doughnut, Line, Pie } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  PointElement, // Add PointElement for Line charts
+  LineElement, // Add LineElement for Line charts
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement, // Add ArcElement for Doughnut and Pie charts
+} from "chart.js";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
+);
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [totalProducts, setTotalProducts] = useState<number | null>(null);
+  const [totalUsers, setTotalUsers] = useState<number | null>(null);
+  const [totalCategories, setTotalCategories] = useState<number | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const products = await apiClient.get("/products");
+        setTotalProducts(products.length);
+        console.log("Fetched products:", products);
+      } catch (error) {
+        console.error("Error fetching products:", error);
+      }
+    };
+
+    const fetchUsers = async () => {
+      try {
+        const users = await apiClient.get("/users");
+        setTotalUsers(users.length);
+        console.log("Fetched users:", users);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+      }
+    };
+
+    const fetchCategories = async () => {
+      try {
+        const categories = await apiClient.get("/categories");
+        setTotalCategories(categories.length);
+        console.log("Fetched categories:", categories);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    };
+
+    fetchProducts();
+    fetchUsers();
+    fetchCategories();
+  }, []);
+
+  // Chart Data
+  const productData = {
+    labels: ["Products"],
+    datasets: [
+      {
+        label: "Total Products",
+        data: [totalProducts || 0],
+        backgroundColor: "rgba(54, 162, 235, 0.6)",
+      },
+    ],
+  };
+
+  const userData = {
+    labels: ["Users"],
+    datasets: [
+      {
+        label: "Total Users",
+        data: [totalUsers || 0],
+        backgroundColor: "rgba(75, 192, 192, 0.6)",
+      },
+    ],
+  };
+
+  const categoryData = {
+    labels: ["Categories"],
+    datasets: [
+      {
+        label: "Total Categories",
+        data: [totalCategories || 0],
+        backgroundColor: "rgba(153, 102, 255, 0.6)",
+      },
+    ],
+  };
+
+  const salesData = {
+    labels: ["Products", "Users", "Categories"],
+    datasets: [
+      {
+        label: "Data Overview",
+        data: [totalProducts || 0, totalUsers || 0, totalCategories || 0],
+        backgroundColor: [
+          "rgba(54, 162, 235, 0.6)",
+          "rgba(75, 192, 192, 0.6)",
+          "rgba(153, 102, 255, 0.6)",
+        ],
+      },
+    ],
+  };
+
+  return (
+    <div className="space-y-6">
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Quick Stats Cards */}
+        <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition">
+          <h2 className="text-xl font-semibold mb-4">Total Products</h2>
+          <p className="text-4xl font-bold text-blue-600">
+            {totalProducts ?? "Loading..."}
+          </p>
+          <button className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">
+            View Products
+          </button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition">
+          <h2 className="text-xl font-semibold mb-4">Total Users</h2>
+          <p className="text-4xl font-bold text-green-600">
+            {totalUsers ?? "Loading..."}
+          </p>
+          <button className="mt-4 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition">
+            View Users
+          </button>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition">
+          <h2 className="text-xl font-semibold mb-4">Total Categories</h2>
+          <p className="text-4xl font-bold text-purple-600">
+            {totalCategories ?? "Loading..."}
+          </p>
+          <button className="mt-4 bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 transition">
+            View Categories
+          </button>
+        </div>
+      </section>
+
+      <section className="bg-white p-6 rounded-lg shadow-md">
+        <h2 className="text-2xl font-semibold mb-4">Performance Overview</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-gray-200 p-4 rounded-md text-gray-700 h-64">
+            <Bar
+              data={productData}
+              options={{
+                responsive: true,
+                plugins: { legend: { position: "top" } },
+              }}
+            />
+          </div>
+          <div className="bg-gray-200 p-4 rounded-md text-gray-700 h-64">
+            <Doughnut
+              data={userData}
+              options={{
+                responsive: true,
+                plugins: { legend: { position: "top" } },
+              }}
+            />
+          </div>
+          <div className="bg-gray-200 p-4 rounded-md text-gray-700 h-64">
+            <Line
+              data={categoryData}
+              options={{
+                responsive: true,
+                plugins: { legend: { position: "top" } },
+              }}
+            />
+          </div>
+          <div className="bg-gray-200 p-4 rounded-md text-gray-700 h-64">
+            <Pie
+              data={salesData}
+              options={{
+                responsive: true,
+                plugins: { legend: { position: "top" } },
+              }}
+            />
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
