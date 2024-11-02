@@ -1,21 +1,21 @@
-// src/app/page.tsx
 "use client";
-
 import React, { useEffect, useState } from "react";
-import { apiClient } from "./utils/apiClient"; // Import the API client
-import { Bar, Doughnut, Line, Pie } from "react-chartjs-2";
+import { useRouter } from "next/navigation";
+import { apiClient } from "./utils/apiClient";
+import { Bar, Doughnut, Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   BarElement,
-  PointElement, // Add PointElement for Line charts
-  LineElement, // Add LineElement for Line charts
+  PointElement,
+  LineElement,
   Title,
   Tooltip,
   Legend,
-  ArcElement, // Add ArcElement for Doughnut and Pie charts
+  ArcElement,
 } from "chart.js";
+import { FiTrendingUp, FiUsers, FiBox, FiList } from "react-icons/fi";
 
 ChartJS.register(
   CategoryScale,
@@ -29,172 +29,166 @@ ChartJS.register(
   ArcElement
 );
 
+const StatCard = ({ title, value, icon, color, onClick }: any) => (
+  <div
+    onClick={onClick}
+    className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 cursor-pointer hover:shadow-md transition-all duration-200"
+  >
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-sm font-medium text-gray-600">{title}</p>
+        <p className="mt-2 text-3xl font-semibold text-gray-900">
+          {value ?? <span className="text-gray-400 text-2xl">Loading...</span>}
+        </p>
+      </div>
+      <div className={`p-3 rounded-lg ${color}`}>{icon}</div>
+    </div>
+  </div>
+);
+
 export default function Home() {
+  const router = useRouter();
   const [totalProducts, setTotalProducts] = useState<number | null>(null);
   const [totalUsers, setTotalUsers] = useState<number | null>(null);
   const [totalCategories, setTotalCategories] = useState<number | null>(null);
 
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchData = async () => {
       try {
         const products = await apiClient.get("/products");
         setTotalProducts(products.length);
-        console.log("Fetched products:", products);
-      } catch (error) {
-        console.error("Error fetching products:", error);
-      }
-    };
-
-    const fetchUsers = async () => {
-      try {
         const users = await apiClient.get("/users");
         setTotalUsers(users.length);
-        console.log("Fetched users:", users);
-      } catch (error) {
-        console.error("Error fetching users:", error);
-      }
-    };
-
-    const fetchCategories = async () => {
-      try {
         const categories = await apiClient.get("/categories");
         setTotalCategories(categories.length);
-        console.log("Fetched categories:", categories);
       } catch (error) {
-        console.error("Error fetching categories:", error);
+        console.error("Error fetching data:", error);
       }
     };
 
-    fetchProducts();
-    fetchUsers();
-    fetchCategories();
+    fetchData();
   }, []);
 
-  // Chart Data
-  const productData = {
-    labels: ["Products"],
+  const chartData = {
+    labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
     datasets: [
       {
-        label: "Total Products",
-        data: [totalProducts || 0],
-        backgroundColor: "rgba(54, 162, 235, 0.6)",
+        label: "Products",
+        data: [65, 59, 80, 81, 56, 55],
+        borderColor: "rgb(99, 102, 241)",
+        backgroundColor: "rgba(99, 102, 241, 0.5)",
+      },
+      {
+        label: "Users",
+        data: [28, 48, 40, 19, 86, 27],
+        borderColor: "rgb(14, 165, 233)",
+        backgroundColor: "rgba(14, 165, 233, 0.5)",
       },
     ],
   };
 
-  const userData = {
-    labels: ["Users"],
-    datasets: [
-      {
-        label: "Total Users",
-        data: [totalUsers || 0],
-        backgroundColor: "rgba(75, 192, 192, 0.6)",
-      },
-    ],
-  };
-
-  const categoryData = {
-    labels: ["Categories"],
-    datasets: [
-      {
-        label: "Total Categories",
-        data: [totalCategories || 0],
-        backgroundColor: "rgba(153, 102, 255, 0.6)",
-      },
-    ],
-  };
-
-  const salesData = {
+  const doughnutData = {
     labels: ["Products", "Users", "Categories"],
     datasets: [
       {
-        label: "Data Overview",
         data: [totalProducts || 0, totalUsers || 0, totalCategories || 0],
         backgroundColor: [
-          "rgba(54, 162, 235, 0.6)",
-          "rgba(75, 192, 192, 0.6)",
-          "rgba(153, 102, 255, 0.6)",
+          "rgba(99, 102, 241, 0.8)",
+          "rgba(14, 165, 233, 0.8)",
+          "rgba(168, 85, 247, 0.8)",
         ],
+        borderColor: "white",
+        borderWidth: 2,
       },
     ],
   };
 
   return (
     <div className="space-y-6">
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Quick Stats Cards */}
-        <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition">
-          <h2 className="text-xl font-semibold mb-4">Total Products</h2>
-          <p className="text-4xl font-bold text-blue-600">
-            {totalProducts ?? "Loading..."}
-          </p>
-          <button className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition">
-            View Products
-          </button>
-        </div>
+      {/* Page Header */}
+      <div className="sm:flex sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-semibold text-gray-900">
+          Dashboard Overview
+        </h1>
+        <button className="mt-3 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+          <FiTrendingUp className="mr-2" />
+          View Reports
+        </button>
+      </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition">
-          <h2 className="text-xl font-semibold mb-4">Total Users</h2>
-          <p className="text-4xl font-bold text-green-600">
-            {totalUsers ?? "Loading..."}
-          </p>
-          <button className="mt-4 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition">
-            View Users
-          </button>
-        </div>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <StatCard
+          title="Total Products"
+          value={totalProducts}
+          icon={<FiBox className="w-6 h-6 text-indigo-600" />}
+          color="bg-indigo-100"
+          onClick={() => router.push("/products")}
+        />
+        <StatCard
+          title="Total Users"
+          value={totalUsers}
+          icon={<FiUsers className="w-6 h-6 text-sky-600" />}
+          color="bg-sky-100"
+          onClick={() => router.push("/users")}
+        />
+        <StatCard
+          title="Total Categories"
+          value={totalCategories}
+          icon={<FiList className="w-6 h-6 text-purple-600" />}
+          color="bg-purple-100"
+          onClick={() => router.push("/categories")}
+        />
+      </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition">
-          <h2 className="text-xl font-semibold mb-4">Total Categories</h2>
-          <p className="text-4xl font-bold text-purple-600">
-            {totalCategories ?? "Loading..."}
-          </p>
-          <button className="mt-4 bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 transition">
-            View Categories
-          </button>
-        </div>
-      </section>
-
-      <section className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-2xl font-semibold mb-4">Performance Overview</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-gray-200 p-4 rounded-md text-gray-700 h-64">
-            <Bar
-              data={productData}
-              options={{
-                responsive: true,
-                plugins: { legend: { position: "top" } },
-              }}
-            />
-          </div>
-          <div className="bg-gray-200 p-4 rounded-md text-gray-700 h-64">
-            <Doughnut
-              data={userData}
-              options={{
-                responsive: true,
-                plugins: { legend: { position: "top" } },
-              }}
-            />
-          </div>
-          <div className="bg-gray-200 p-4 rounded-md text-gray-700 h-64">
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Growth Overview
+          </h3>
+          <div className="h-80">
             <Line
-              data={categoryData}
+              data={chartData}
               options={{
                 responsive: true,
-                plugins: { legend: { position: "top" } },
-              }}
-            />
-          </div>
-          <div className="bg-gray-200 p-4 rounded-md text-gray-700 h-64">
-            <Pie
-              data={salesData}
-              options={{
-                responsive: true,
-                plugins: { legend: { position: "top" } },
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    position: "top" as const,
+                  },
+                },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                  },
+                },
               }}
             />
           </div>
         </div>
-      </section>
+
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Distribution
+          </h3>
+          <div className="h-80">
+            <Doughnut
+              data={doughnutData}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    position: "top" as const,
+                  },
+                },
+              }}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
+[];

@@ -4,7 +4,6 @@ import localFont from "next/font/local";
 import "./globals.css";
 import DashboardLayout from "./components/DashboardLayout";
 
-// Define and load custom fonts
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
   variable: "--font-geist-sans",
@@ -24,9 +23,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
       <body

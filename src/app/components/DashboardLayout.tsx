@@ -1,70 +1,133 @@
-// src/components/DashboardLayout.tsx
 "use client";
-
-import React from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  FiHome,
+  FiBox,
+  FiUsers,
+  FiList,
+  FiBell,
+  FiSettings,
+  FiMenu,
+} from "react-icons/fi";
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const router = useRouter();
 
+  const navigationItems = [
+    { name: "Dashboard", icon: <FiHome className="w-5 h-5" />, path: "/" },
+    {
+      name: "Products",
+      icon: <FiBox className="w-5 h-5" />,
+      path: "/products",
+    },
+    { name: "Users", icon: <FiUsers className="w-5 h-5" />, path: "/users" },
+    {
+      name: "Categories",
+      icon: <FiList className="w-5 h-5" />,
+      path: "/categories",
+    },
+    {
+      name: "Notifications",
+      icon: <FiBell className="w-5 h-5" />,
+      path: "/notifications",
+    },
+    {
+      name: "Settings",
+      icon: <FiSettings className="w-5 h-5" />,
+      path: "/settings",
+    },
+  ];
+
   return (
-    <div className="flex flex-col min-h-screen bg-gray-100 text-gray-900">
-      {/* Dashboard Header */}
-      <header className="bg-gray-800 text-white p-4 flex justify-between items-center shadow">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <button
-          className="bg-blue-500 px-4 py-2 rounded-md hover:bg-blue-600 transition"
-          onClick={() => router.push("/settings")}
-        >
-          Settings
-        </button>
-      </header>
+    <div className="flex h-screen bg-gray-50">
+      {/* Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-gray-800/50 backdrop-blur-sm md:hidden z-20"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed md:static inset-y-0 left-0 z-30 w-72 transform transition-transform duration-300 ease-in-out 
+          ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          } md:translate-x-0
+          bg-white border-r border-gray-200 shadow-lg md:shadow-none`}
+      >
+        <div className="flex flex-col h-full">
+          {/* Logo Area */}
+          <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
+            <span className="text-xl font-semibold text-gray-800">
+              Dashboard
+            </span>
+            <button
+              className="p-2 rounded-lg md:hidden hover:bg-gray-100"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <FiMenu className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+            {navigationItems.map((item) => (
+              <button
+                key={item.name}
+                onClick={() => {
+                  router.push(item.path);
+                  setSidebarOpen(false);
+                }}
+                className="flex items-center w-full px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all duration-200"
+              >
+                {item.icon}
+                <span className="ml-3 font-medium">{item.name}</span>
+              </button>
+            ))}
+          </nav>
+
+          {/* User Profile */}
+          <div className="p-4 border-t border-gray-200">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-full bg-gray-200" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">Admin User</p>
+                <p className="text-xs text-gray-500">admin@example.com</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
 
       {/* Main Content */}
-      <div className="flex flex-1">
-        {/* Sidebar */}
-        <aside className="w-64 bg-gray-900 text-white p-4 hidden md:block">
-          <nav className="space-y-4">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top Header */}
+        <header className="h-16 bg-white border-b border-gray-200">
+          <div className="flex items-center justify-between h-full px-6">
             <button
-              onClick={() => router.push("/")}
-              className="w-full bg-gray-700 px-4 py-2 rounded text-left hover:bg-gray-600 transition"
+              className="p-2 rounded-lg md:hidden hover:bg-gray-100"
+              onClick={() => setSidebarOpen(true)}
             >
-              Dashboard
+              <FiMenu className="w-5 h-5" />
             </button>
-            <button
-              onClick={() => router.push("/products")}
-              className="w-full bg-gray-700 px-4 py-2 rounded text-left hover:bg-gray-600 transition"
-            >
-              Products
-            </button>
-            <button
-              onClick={() => router.push("/users")}
-              className="w-full bg-gray-700 px-4 py-2 rounded text-left hover:bg-gray-600 transition"
-            >
-              Users
-            </button>
-            <button
-              onClick={() => router.push("/categories")}
-              className="w-full bg-gray-700 px-4 py-2 rounded text-left hover:bg-gray-600 transition"
-            >
-              Categories
-            </button>
-            <button
-              onClick={() => router.push("/notification")}
-              className="w-full bg-gray-700 px-4 py-2 rounded text-left hover:bg-gray-600 transition"
-            >
-              Notification
-            </button>
-          </nav>
-        </aside>
+            <div className="flex items-center space-x-4">
+              <button className="p-2 rounded-lg hover:bg-gray-100">
+                <FiBell className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </header>
 
-        {/* Main content area */}
-        <main className="flex-1 p-6">{children}</main>
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-auto">
+          <div className="container mx-auto p-6">{children}</div>
+        </main>
       </div>
     </div>
   );
-}
+};
+
+export default DashboardLayout;
