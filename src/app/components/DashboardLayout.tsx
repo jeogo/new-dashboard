@@ -31,7 +31,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
     {
       name: "Notifications",
       icon: <FiBell className="w-5 h-5" />,
-      path: "/notifications",
+      path: "/notification",
     },
     {
       name: "Settings",

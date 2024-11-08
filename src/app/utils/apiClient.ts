@@ -1,7 +1,7 @@
 // src/utils/apiClient.ts
 
 const BASE_URL =
-  process.env.NEXT_PUBLIC_BASE_URL || "https://storebot.fra1.zeabur.app";
+  process.env.NEXT_PUBLIC_BASE_URL || "https://storebot-ouuf.onrender.com";
 
 export const apiClient = {
   get: async (endpoint: string) => {
