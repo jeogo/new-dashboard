@@ -9,6 +9,8 @@ import {
   FiBell,
   FiSettings,
   FiMenu,
+  FiClock,
+  FiFileText,
 } from "react-icons/fi";
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
@@ -32,6 +34,16 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       name: "Notifications",
       icon: <FiBell className="w-5 h-5" />,
       path: "/notification",
+    },
+    {
+      name: "Historic",
+      icon: <FiClock className="w-5 h-5" />,
+      path: "/historic",
+    },
+    {
+      name: "Pre-Orders",
+      icon: <FiFileText className="w-5 h-5" />,
+      path: "/preorders",
     },
     {
       name: "Settings",

@@ -4,13 +4,6 @@
 import React, { useState, useEffect } from "react";
 import { apiClient } from "../utils/apiClient";
 
-interface HistoryEntry {
-  date: string;
-  type: string;
-  amount: number;
-  description: string;
-}
-
 interface User {
   _id: string;
   telegramId: string;
@@ -18,7 +11,24 @@ interface User {
   name: string;
   balance: number;
   registerDate: string;
-  history: HistoryEntry[];
+  isActive: boolean;
+  isAccepted: boolean;
+  isBanned: boolean;
+  totalRecharged: number;
+}
+
+interface HistoryEntry {
+  _id: string;
+  entity: string;
+  entityId: string;
+  action: string;
+  timestamp: string;
+  performedBy: {
+    type: string;
+    id: string | null;
+  };
+  details: string;
+  metadata?: Record<string, any>;
 }
 
 export default function UsersPage() {
@@ -29,6 +39,8 @@ export default function UsersPage() {
   const [showResetModal, setShowResetModal] = useState(false);
   const [balanceInput, setBalanceInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [userHistory, setUserHistory] = useState<HistoryEntry[]>([]);
+  const [showBanModal, setShowBanModal] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -39,19 +51,14 @@ export default function UsersPage() {
     try {
       setIsLoading(true);
       const response = await apiClient.get("/users");
-      setUsers(response);
+      const users: User[] = response;
+      setUsers(users);
       setIsLoading(false);
     } catch (error) {
       console.error("Error fetching users:", error);
       setIsLoading(false);
     }
   };
-
-  // Calculate total recharged amount
-  const calculateTotalRecharge = (user: User) =>
-    user.history
-      .filter((entry) => entry.type === "charge" && entry.amount > 0)
-      .reduce((total, entry) => total + entry.amount, 0);
 
   // Handle balance update with positive or negative amounts
   const handleUpdateBalance = async () => {
@@ -63,7 +70,7 @@ export default function UsersPage() {
         await apiClient.put(`/users/${selectedUser._id}/balance`, { amount });
 
         // Refresh users list to update balance
-        fetchUsers();
+        await fetchUsers();
         setBalanceInput("");
         setShowEditModal(false);
       } catch (error) {
@@ -72,19 +79,78 @@ export default function UsersPage() {
     }
   };
 
-  // Handle reset balance and history
+  // Handle reset balance
   const handleResetBalance = async () => {
     if (selectedUser) {
       try {
-        // Reset balance and history on the server
+        // Reset balance on the server
         await apiClient.put(`/users/${selectedUser._id}/reset`, {});
 
-        // Refresh users list to update balance and history
-        fetchUsers();
+        // Refresh users list to update balance
+        await fetchUsers();
         setShowResetModal(false);
       } catch (error) {
-        console.error("Error resetting user account:", error);
+        console.error("Error resetting user balance:", error);
       }
+    }
+  };
+
+  // Handle accept user
+  const handleAcceptUser = async (userId: string) => {
+    try {
+      await apiClient.put(`/users/${userId}`, { isAccepted: true });
+      await fetchUsers();
+    } catch (error) {
+      console.error("Error accepting user:", error);
+    }
+  };
+
+  // Handle reject user
+  const handleRejectUser = async (userId: string) => {
+    try {
+      await apiClient.put(`/users/${userId}`, { isAccepted: false });
+      await fetchUsers();
+    } catch (error) {
+      console.error("Error rejecting user:", error);
+    }
+  };
+
+  // Fetch user history
+  const fetchUserHistory = async (userId: string) => {
+    try {
+      const response = await apiClient.get(`/history/user/${userId}`);
+      const historyEntries: HistoryEntry[] = response;
+      setUserHistory(historyEntries);
+    } catch (error) {
+      console.error("Error fetching user history:", error);
+    }
+  };
+
+  // Calculate total recharged amount
+  const calculateTotalRecharge = (user: User) => {
+    return user.totalRecharged || 0;
+  };
+
+  // Handle ban user
+  const handleBanUser = async () => {
+    if (selectedUser) {
+      try {
+        await apiClient.put(`/users/${selectedUser._id}`, { isBanned: true });
+        await fetchUsers();
+        setShowBanModal(false);
+      } catch (error) {
+        console.error("Error banning user:", error);
+      }
+    }
+  };
+
+  // Handle unban user
+  const handleUnbanUser = async (userId: string) => {
+    try {
+      await apiClient.put(`/users/${userId}`, { isBanned: false });
+      await fetchUsers();
+    } catch (error) {
+      console.error("Error unbanning user:", error);
     }
   };
 
@@ -97,13 +163,15 @@ export default function UsersPage() {
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full bg-white border border-gray-200">
-            <thead>
+            <thead className="bg-gray-100">
               <tr>
                 <th className="text-left p-4 border-b">Telegram ID</th>
                 <th className="text-left p-4 border-b">Username</th>
                 <th className="text-left p-4 border-b">Name</th>
                 <th className="text-left p-4 border-b">Balance</th>
                 <th className="text-left p-4 border-b">Total Recharged</th>
+                <th className="text-left p-4 border-b">Accepted</th>
+                <th className="text-left p-4 border-b">Banned</th>
                 <th className="text-left p-4 border-b">Actions</th>
               </tr>
             </thead>
@@ -114,12 +182,41 @@ export default function UsersPage() {
                   <td className="p-4 border-b">@{user.username}</td>
                   <td className="p-4 border-b">{user.name}</td>
                   <td className="p-4 border-b text-green-600 font-semibold">
-                    {user.balance} Points
+                    {user.balance} Units
                   </td>
                   <td className="p-4 border-b text-blue-600 font-semibold">
-                    {calculateTotalRecharge(user)} Points
+                    {calculateTotalRecharge(user)} Units
                   </td>
-                  <td className="p-4 border-b space-x-2">
+                  <td className="p-4 border-b">
+                    {user.isAccepted ? (
+                      <span className="text-green-600 font-semibold">Yes</span>
+                    ) : (
+                      <span className="text-red-600 font-semibold">No</span>
+                    )}
+                  </td>
+                  <td className="p-4 border-b">
+                    {user.isBanned ? (
+                      <span className="text-red-600 font-semibold">Yes</span>
+                    ) : (
+                      <span className="text-green-600 font-semibold">No</span>
+                    )}
+                  </td>
+                  <td className="p-4 border-b space-x-2 flex flex-wrap">
+                    {!user.isAccepted ? (
+                      <button
+                        onClick={() => handleAcceptUser(user._id)}
+                        className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 transition"
+                      >
+                        Accept
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleRejectUser(user._id)}
+                        className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600 transition"
+                      >
+                        Reject
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         setSelectedUser(user);
@@ -130,8 +227,9 @@ export default function UsersPage() {
                       Adjust Balance
                     </button>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         setSelectedUser(user);
+                        await fetchUserHistory(user._id);
                         setShowHistoryModal(true);
                       }}
                       className="bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600 transition"
@@ -143,10 +241,28 @@ export default function UsersPage() {
                         setSelectedUser(user);
                         setShowResetModal(true);
                       }}
-                      className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition"
+                      className="bg-indigo-500 text-white px-2 py-1 rounded hover:bg-indigo-600 transition"
                     >
-                      Reset Account
+                      Reset Balance
                     </button>
+                    {!user.isBanned ? (
+                      <button
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setShowBanModal(true);
+                        }}
+                        className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition"
+                      >
+                        Ban User
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleUnbanUser(user._id)}
+                        className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 transition"
+                      >
+                        Unban User
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -171,7 +287,10 @@ export default function UsersPage() {
             />
             <div className="flex justify-end space-x-2">
               <button
-                onClick={() => setShowEditModal(false)}
+                onClick={() => {
+                  setBalanceInput("");
+                  setShowEditModal(false);
+                }}
                 className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500 transition"
               >
                 Cancel
@@ -189,32 +308,35 @@ export default function UsersPage() {
 
       {/* History Modal */}
       {showHistoryModal && selectedUser && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-xl max-h-screen overflow-y-auto">
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl max-h-screen overflow-y-auto">
             <h2 className="text-xl font-bold mb-4">
               History for {selectedUser.name}
             </h2>
-            {selectedUser.history.length > 0 ? (
+            {userHistory.length > 0 ? (
               <ul className="space-y-2">
-                {selectedUser.history
+                {userHistory
                   .slice()
                   .reverse()
-                  .map((entry, index) => (
-                    <li key={index} className="border-b pb-2">
+                  .map((entry) => (
+                    <li key={entry._id} className="border-b pb-2">
                       <p className="text-sm text-gray-600">
-                        {new Date(entry.date).toLocaleString()}
+                        {new Date(entry.timestamp).toLocaleString()}
                       </p>
                       <p>
-                        {entry.description} (
-                        <span
-                          className={
-                            entry.amount > 0 ? "text-green-600" : "text-red-600"
-                          }
-                        >
-                          {entry.amount > 0 ? "+" : ""}
-                          {entry.amount} Points
-                        </span>
-                        )
+                        {entry.details}{" "}
+                        {entry.metadata && entry.metadata.amount && (
+                          <span
+                            className={
+                              entry.metadata.amount > 0
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }
+                          >
+                            {entry.metadata.amount > 0 ? "+" : ""}
+                            {entry.metadata.amount} Units
+                          </span>
+                        )}
                       </p>
                     </li>
                   ))}
@@ -234,14 +356,14 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* Reset Account Confirmation Modal */}
+      {/* Reset Balance Confirmation Modal */}
       {showResetModal && selectedUser && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-80">
             <h2 className="text-xl font-bold mb-4">Confirm Reset</h2>
             <p>
-              Are you sure you want to reset the balance and history for{" "}
-              {selectedUser.name}?
+              Are you sure you want to reset the balance for {selectedUser.name}
+              ?
             </p>
             <div className="flex justify-end mt-4 space-x-2">
               <button
@@ -255,6 +377,33 @@ export default function UsersPage() {
                 className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition"
               >
                 Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ban User Confirmation Modal */}
+      {showBanModal && selectedUser && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-80">
+            <h2 className="text-xl font-bold mb-4">Confirm Ban</h2>
+            <p>
+              Are you sure you want to ban {selectedUser.name}? They will not be
+              able to access the bot.
+            </p>
+            <div className="flex justify-end mt-4 space-x-2">
+              <button
+                onClick={() => setShowBanModal(false)}
+                className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBanUser}
+                className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition"
+              >
+                Confirm Ban
               </button>
             </div>
           </div>
