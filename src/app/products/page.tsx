@@ -1,8 +1,14 @@
-// src/app/products/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { apiClient } from "../utils/apiClient";
+import {
+  FaEdit,
+  FaTrash,
+  FaHistory,
+  FaPlusCircle,
+  FaSpinner,
+} from "react-icons/fa";
 
 interface Product {
   _id: string;
@@ -24,16 +30,48 @@ interface Category {
 interface HistoryEntry {
   _id: string;
   entity: string;
-  entityId: string;
   action: string;
   timestamp: string;
-  performedBy: {
-    type: string;
-    id: string | null;
-  };
   details: string;
   metadata?: Record<string, any>;
 }
+
+const Modal = ({
+  title,
+  children,
+  onClose,
+  onConfirm,
+  confirmText = "Confirm",
+}: {
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+  onConfirm?: () => void;
+  confirmText?: string;
+}) => (
+  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
+    <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-screen overflow-y-auto">
+      <h2 className="text-2xl font-bold mb-4">{title}</h2>
+      {children}
+      <div className="flex justify-end mt-4 space-x-4">
+        <button
+          onClick={onClose}
+          className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition"
+        >
+          Close
+        </button>
+        {onConfirm && (
+          <button
+            onClick={onConfirm}
+            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition"
+          >
+            {confirmText}
+          </button>
+        )}
+      </div>
+    </div>
+  </div>
+);
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -60,20 +98,18 @@ export default function ProductsPage() {
     fetchCategories();
   }, []);
 
-  // Fetch products from the server
   const fetchProducts = async () => {
     try {
       setIsLoading(true);
       const response = await apiClient.get("/products");
       setProducts(response);
-      setIsLoading(false);
     } catch (error) {
       console.error("Error fetching products:", error);
+    } finally {
       setIsLoading(false);
     }
   };
 
-  // Fetch categories from the server
   const fetchCategories = async () => {
     try {
       const response = await apiClient.get("/categories");
@@ -83,25 +119,16 @@ export default function ProductsPage() {
     }
   };
 
-  // Fetch product history from the server
   const fetchProductHistory = async (productId: string) => {
     try {
-      const response = await apiClient.get(`/history/product/${productId}`);
+      const response = await apiClient.get(`/historic/product/${productId}`);
       setProductHistory(response);
+      setShowHistoryModal(true);
     } catch (error) {
       console.error("Error fetching product history:", error);
     }
   };
 
-  // Helper function to process raw email text into an array of emails
-  const extractEmails = (text: string) => {
-    return text
-      .split(/[\s,;]+/) // Split by whitespace, commas, or semicolons
-      .map((email) => email.trim()) // Remove extra spaces
-      .filter((email) => email); // Filter out empty entries
-  };
-
-  // Function to handle the creation of a new product
   const handleCreateProduct = async () => {
     try {
       const {
@@ -114,7 +141,6 @@ export default function ProductsPage() {
         allowPreOrder,
       } = newProductData;
 
-      // Validation
       if (!name || !price || !categoryId) {
         alert("Name, Price, and Category are required.");
         return;
@@ -124,7 +150,7 @@ export default function ProductsPage() {
         name,
         description,
         price: parseFloat(price),
-        emails: extractEmails(emailsText),
+        emails: emailsText.split(",").map((email) => email.trim()),
         categoryId,
         isAvailable,
         allowPreOrder,
@@ -139,7 +165,6 @@ export default function ProductsPage() {
     }
   };
 
-  // Function to open the edit modal with selected product's data
   const handleEditClick = (product: Product) => {
     setSelectedProduct(product);
     setNewProductData({
@@ -154,7 +179,6 @@ export default function ProductsPage() {
     setShowEditModal(true);
   };
 
-  // Function to save edits to the selected product
   const handleSaveEdit = async () => {
     if (selectedProduct) {
       try {
@@ -168,7 +192,6 @@ export default function ProductsPage() {
           allowPreOrder,
         } = newProductData;
 
-        // Validation
         if (!name || !price || !categoryId) {
           alert("Name, Price, and Category are required.");
           return;
@@ -178,7 +201,7 @@ export default function ProductsPage() {
           name,
           description,
           price: parseFloat(price),
-          emails: extractEmails(emailsText),
+          emails: emailsText.split(",").map((email) => email.trim()),
           categoryId,
           isAvailable,
           allowPreOrder,
@@ -188,7 +211,6 @@ export default function ProductsPage() {
           `/products/${selectedProduct._id}`,
           updatedProductData
         );
-
         resetFormData();
         setShowEditModal(false);
         fetchProducts();
@@ -198,13 +220,11 @@ export default function ProductsPage() {
     }
   };
 
-  // Function to confirm deletion of a product
   const handleDeleteClick = (product: Product) => {
     setSelectedProduct(product);
     setShowDeleteModal(true);
   };
 
-  // Function to delete the selected product
   const handleConfirmDelete = async () => {
     if (selectedProduct) {
       try {
@@ -218,14 +238,6 @@ export default function ProductsPage() {
     }
   };
 
-  // Function to view product history
-  const handleViewHistory = async (product: Product) => {
-    setSelectedProduct(product);
-    await fetchProductHistory(product._id);
-    setShowHistoryModal(true);
-  };
-
-  // Helper function to reset form data to initial state
   const resetFormData = () => {
     setNewProductData({
       name: "",
@@ -240,72 +252,70 @@ export default function ProductsPage() {
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
-      <h1 className="text-2xl font-bold mb-6">Products</h1>
+      <h1 className="text-3xl font-bold mb-6 text-center">
+        Product Management
+      </h1>
 
-      {/* Button to open the Create Product Modal */}
       <button
         onClick={() => setShowCreateModal(true)}
-        className="bg-green-500 text-white px-6 py-2 rounded-lg mb-4 shadow hover:bg-green-600 transition"
+        className="bg-green-500 text-white px-6 py-2 rounded-lg mb-4 shadow hover:bg-green-600"
       >
-        Add New Product
+        <FaPlusCircle className="inline-block mr-2" /> Add New Product
       </button>
 
-      {/* Product Table */}
       {isLoading ? (
-        <p>Loading products...</p>
+        <div className="flex justify-center">
+          <FaSpinner className="animate-spin text-gray-500" size={36} />
+        </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-full bg-white border border-gray-200 rounded-lg shadow">
-            <thead>
-              <tr className="bg-gray-100 text-gray-600 text-left text-sm font-semibold uppercase">
-                <th className="p-4 border-b">Name</th>
-                <th className="p-4 border-b">Description</th>
-                <th className="p-4 border-b">Price</th>
-                <th className="p-4 border-b">Category</th>
-                <th className="p-4 border-b">Emails Count</th>
-                <th className="p-4 border-b">Available</th>
-                <th className="p-4 border-b">Pre-Order</th>
-                <th className="p-4 border-b">Actions</th>
+          <table className="min-w-full bg-white border border-gray-200">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="text-left p-4 border-b">Name</th>
+                <th className="text-left p-4 border-b">Price</th>
+                <th className="text-left p-4 border-b">Category</th>
+                <th className="text-left p-4 border-b">Available</th>
+                <th className="text-left p-4 border-b">Pre-Order</th>
+                <th className="text-left p-4 border-b">Actions</th>
               </tr>
             </thead>
             <tbody>
               {products.map((product) => (
-                <tr key={product._id} className="hover:bg-gray-50 transition">
+                <tr key={product._id} className="hover:bg-gray-50">
                   <td className="p-4 border-b">{product.name}</td>
+                  <td className="p-4 border-b">{product.price} Units</td>
                   <td className="p-4 border-b">
-                    {product.description || "N/A"}
+                    {categories.find((cat) => cat._id === product.categoryId)
+                      ?.name || "Uncategorized"}
                   </td>
-                  <td className="p-4 border-b">${product.price}</td>
-                  <td className="p-4 border-b">
-                    {categories.find(
-                      (category) => category._id === product.categoryId
-                    )?.name || "Uncategorized"}
-                  </td>
-                  <td className="p-4 border-b">{product.emails.length}</td>
                   <td className="p-4 border-b">
                     {product.isAvailable ? "Yes" : "No"}
                   </td>
                   <td className="p-4 border-b">
                     {product.allowPreOrder ? "Yes" : "No"}
                   </td>
-                  <td className="p-4 border-b flex flex-wrap gap-2">
+                  <td className="p-4 border-b space-x-3">
                     <button
                       onClick={() => handleEditClick(product)}
-                      className="bg-blue-500 text-white px-3 py-1 rounded shadow hover:bg-blue-600 transition"
+                      className="text-blue-500 hover:text-blue-700"
+                      title="Edit Product"
                     >
-                      Edit
+                      <FaEdit size={18} />
                     </button>
                     <button
                       onClick={() => handleDeleteClick(product)}
-                      className="bg-red-500 text-white px-3 py-1 rounded shadow hover:bg-red-600 transition"
+                      className="text-red-500 hover:text-red-700"
+                      title="Delete Product"
                     >
-                      Delete
+                      <FaTrash size={18} />
                     </button>
                     <button
-                      onClick={() => handleViewHistory(product)}
-                      className="bg-gray-500 text-white px-3 py-1 rounded shadow hover:bg-gray-600 transition"
+                      onClick={() => fetchProductHistory(product._id)}
+                      className="text-gray-500 hover:text-gray-700"
+                      title="View History"
                     >
-                      View History
+                      <FaHistory size={18} />
                     </button>
                   </td>
                 </tr>
@@ -315,11 +325,10 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* Create Product Modal */}
       {showCreateModal && (
         <Modal
           title="Add New Product"
-          onCancel={() => {
+          onClose={() => {
             setShowCreateModal(false);
             resetFormData();
           }}
@@ -329,16 +338,15 @@ export default function ProductsPage() {
           <ProductForm
             productData={newProductData}
             setProductData={setNewProductData}
-            categories={categories}
+            categories={categories} // Pass categories here
           />
         </Modal>
       )}
 
-      {/* Edit Product Modal */}
-      {showEditModal && selectedProduct && (
+      {showEditModal && (
         <Modal
           title="Edit Product"
-          onCancel={() => {
+          onClose={() => {
             setShowEditModal(false);
             resetFormData();
           }}
@@ -348,36 +356,32 @@ export default function ProductsPage() {
           <ProductForm
             productData={newProductData}
             setProductData={setNewProductData}
-            categories={categories}
+            categories={categories} // Pass categories here
           />
         </Modal>
       )}
 
-      {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <Modal
           title="Delete Product"
-          onCancel={() => setShowDeleteModal(false)}
+          onClose={() => setShowDeleteModal(false)}
           onConfirm={handleConfirmDelete}
           confirmText="Delete"
         >
-          <p>Are you sure you want to delete this product?</p>
+          Are you sure you want to delete this product?
         </Modal>
       )}
 
-      {/* History Modal */}
       {showHistoryModal && selectedProduct && (
         <Modal
           title={`History for ${selectedProduct.name}`}
-          onCancel={() => setShowHistoryModal(false)}
+          onClose={() => setShowHistoryModal(false)}
         >
           {productHistory.length > 0 ? (
-            <ul className="space-y-2">
+            <ul>
               {productHistory.map((entry) => (
-                <li key={entry._id} className="border-b pb-2">
-                  <p className="text-sm text-gray-600">
-                    {new Date(entry.timestamp).toLocaleString()}
-                  </p>
+                <li key={entry._id}>
+                  <p>{new Date(entry.timestamp).toLocaleString()}</p>
                   <p>{entry.details}</p>
                 </li>
               ))}
@@ -398,10 +402,10 @@ function ProductForm({
 }: {
   productData: any;
   setProductData: React.Dispatch<React.SetStateAction<any>>;
-  categories: Category[];
+  categories: Category[]; // Pass categories as a prop
 }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-4">
       <input
         type="text"
         value={productData.name}
@@ -411,14 +415,14 @@ function ProductForm({
         placeholder="Product Name"
         className="p-3 border border-gray-300 rounded"
       />
-      <input
-        type="text"
+      <textarea
         value={productData.description}
         onChange={(e) =>
           setProductData({ ...productData, description: e.target.value })
         }
         placeholder="Description"
-        className="p-3 border border-gray-300 rounded"
+        className="p-3 border border-gray-300 rounded resize-y"
+        rows={3}
       />
       <input
         type="number"
@@ -428,6 +432,15 @@ function ProductForm({
         }
         placeholder="Price"
         className="p-3 border border-gray-300 rounded"
+      />
+      <textarea
+        value={productData.emailsText}
+        onChange={(e) =>
+          setProductData({ ...productData, emailsText: e.target.value })
+        }
+        placeholder="Emails (comma-separated)"
+        className="p-3 border border-gray-300 rounded resize-y"
+        rows={3}
       />
       <select
         value={productData.categoryId}
@@ -443,79 +456,25 @@ function ProductForm({
           </option>
         ))}
       </select>
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-3">
         <input
           type="checkbox"
           checked={productData.isAvailable}
           onChange={(e) =>
             setProductData({ ...productData, isAvailable: e.target.checked })
           }
-          className="h-5 w-5"
         />
         <label>Available</label>
       </div>
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-3">
         <input
           type="checkbox"
           checked={productData.allowPreOrder}
           onChange={(e) =>
             setProductData({ ...productData, allowPreOrder: e.target.checked })
           }
-          className="h-5 w-5"
         />
         <label>Allow Pre-Order</label>
-      </div>
-      {/* Emails Textarea */}
-      <div className="md:col-span-2">
-        <h3 className="text-lg font-semibold mb-2">Emails (free text)</h3>
-        <textarea
-          value={productData.emailsText}
-          onChange={(e) =>
-            setProductData({ ...productData, emailsText: e.target.value })
-          }
-          placeholder="Enter emails freely with line breaks, spaces, commas, or semicolons."
-          className="w-full p-3 border border-gray-300 rounded resize-y"
-          rows={4}
-        />
-      </div>
-    </div>
-  );
-}
-
-function Modal({
-  title,
-  children,
-  onCancel,
-  onConfirm,
-  confirmText = "Confirm",
-}: {
-  title: string;
-  children: React.ReactNode;
-  onCancel: () => void;
-  onConfirm?: () => void;
-  confirmText?: string;
-}) {
-  return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-screen overflow-y-auto">
-        <h2 className="text-2xl font-bold mb-6">{title}</h2>
-        <div className="mb-4">{children}</div>
-        <div className="flex justify-end space-x-3">
-          <button
-            onClick={onCancel}
-            className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500 transition"
-          >
-            Cancel
-          </button>
-          {onConfirm && (
-            <button
-              onClick={onConfirm}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition"
-            >
-              {confirmText}
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );
