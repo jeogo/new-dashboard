@@ -146,11 +146,16 @@ export default function ProductsPage() {
         return;
       }
 
+      const emailsArray = emailsText
+        .split(",")
+        .map((email) => email.trim())
+        .filter((email) => email.length > 0);
+
       const productData = {
         name,
         description,
         price: parseFloat(price),
-        emails: emailsText.split(",").map((email) => email.trim()),
+        emails: emailsArray,
         categoryId,
         isAvailable,
         allowPreOrder,
@@ -201,7 +206,10 @@ export default function ProductsPage() {
           name,
           description,
           price: parseFloat(price),
-          emails: emailsText.split(",").map((email) => email.trim()),
+          emails: emailsText
+            .split(",")
+            .map((email) => email.trim())
+            .filter((email) => email.length > 0),
           categoryId,
           isAvailable,
           allowPreOrder,
@@ -295,27 +303,24 @@ export default function ProductsPage() {
                   <td className="p-4 border-b">
                     {product.allowPreOrder ? "Yes" : "No"}
                   </td>
-                  <td className="p-4 border-b space-x-3">
+                  <td className="p-4 border-b flex space-x-2">
+                    <button
+                      onClick={() => fetchProductHistory(product._id)}
+                      className="bg-blue-500 text-white px-4 py-2 rounded-lg"
+                    >
+                      <FaHistory />
+                    </button>
                     <button
                       onClick={() => handleEditClick(product)}
-                      className="text-blue-500 hover:text-blue-700"
-                      title="Edit Product"
+                      className="bg-yellow-500 text-white px-4 py-2 rounded-lg"
                     >
-                      <FaEdit size={18} />
+                      <FaEdit />
                     </button>
                     <button
                       onClick={() => handleDeleteClick(product)}
-                      className="text-red-500 hover:text-red-700"
-                      title="Delete Product"
+                      className="bg-red-500 text-white px-4 py-2 rounded-lg"
                     >
-                      <FaTrash size={18} />
-                    </button>
-                    <button
-                      onClick={() => fetchProductHistory(product._id)}
-                      className="text-gray-500 hover:text-gray-700"
-                      title="View History"
-                    >
-                      <FaHistory size={18} />
+                      <FaTrash />
                     </button>
                   </td>
                 </tr>
@@ -325,157 +330,238 @@ export default function ProductsPage() {
         </div>
       )}
 
+      {/* Create Product Modal */}
       {showCreateModal && (
         <Modal
-          title="Add New Product"
-          onClose={() => {
-            setShowCreateModal(false);
-            resetFormData();
-          }}
+          title="Create New Product"
+          onClose={() => setShowCreateModal(false)}
           onConfirm={handleCreateProduct}
-          confirmText="Add Product"
         >
-          <ProductForm
-            productData={newProductData}
-            setProductData={setNewProductData}
-            categories={categories} // Pass categories here
-          />
+          <div>
+            <input
+              type="text"
+              placeholder="Product Name"
+              value={newProductData.name}
+              onChange={(e) =>
+                setNewProductData({ ...newProductData, name: e.target.value })
+              }
+              className="w-full p-2 mb-4 border rounded"
+            />
+            <textarea
+              placeholder="Description"
+              value={newProductData.description}
+              onChange={(e) =>
+                setNewProductData({
+                  ...newProductData,
+                  description: e.target.value,
+                })
+              }
+              className="w-full p-2 mb-4 border rounded"
+            />
+            <input
+              type="number"
+              placeholder="Price"
+              value={newProductData.price}
+              onChange={(e) =>
+                setNewProductData({ ...newProductData, price: e.target.value })
+              }
+              className="w-full p-2 mb-4 border rounded"
+            />
+            <textarea
+              placeholder="Emails (comma-separated)"
+              value={newProductData.emailsText}
+              onChange={(e) =>
+                setNewProductData({
+                  ...newProductData,
+                  emailsText: e.target.value,
+                })
+              }
+              className="w-full p-2 mb-4 border rounded"
+            />
+            <select
+              value={newProductData.categoryId}
+              onChange={(e) =>
+                setNewProductData({
+                  ...newProductData,
+                  categoryId: e.target.value,
+                })
+              }
+              className="w-full p-2 mb-4 border rounded"
+            >
+              <option value="">Select Category</option>
+              {categories.map((category) => (
+                <option key={category._id} value={category._id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+            <div className="flex items-center space-x-4">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={newProductData.isAvailable}
+                  onChange={() =>
+                    setNewProductData({
+                      ...newProductData,
+                      isAvailable: !newProductData.isAvailable,
+                    })
+                  }
+                />
+                Available
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={newProductData.allowPreOrder}
+                  onChange={() =>
+                    setNewProductData({
+                      ...newProductData,
+                      allowPreOrder: !newProductData.allowPreOrder,
+                    })
+                  }
+                />
+                Allow Pre-Order
+              </label>
+            </div>
+          </div>
         </Modal>
       )}
 
-      {showEditModal && (
+      {/* Edit Product Modal */}
+      {showEditModal && selectedProduct && (
         <Modal
           title="Edit Product"
-          onClose={() => {
-            setShowEditModal(false);
-            resetFormData();
-          }}
+          onClose={() => setShowEditModal(false)}
           onConfirm={handleSaveEdit}
-          confirmText="Save Changes"
         >
-          <ProductForm
-            productData={newProductData}
-            setProductData={setNewProductData}
-            categories={categories} // Pass categories here
-          />
+          <div>
+            <input
+              type="text"
+              placeholder="Product Name"
+              value={newProductData.name}
+              onChange={(e) =>
+                setNewProductData({ ...newProductData, name: e.target.value })
+              }
+              className="w-full p-2 mb-4 border rounded"
+            />
+            <textarea
+              placeholder="Description"
+              value={newProductData.description}
+              onChange={(e) =>
+                setNewProductData({
+                  ...newProductData,
+                  description: e.target.value,
+                })
+              }
+              className="w-full p-2 mb-4 border rounded"
+            />
+            <input
+              type="number"
+              placeholder="Price"
+              value={newProductData.price}
+              onChange={(e) =>
+                setNewProductData({ ...newProductData, price: e.target.value })
+              }
+              className="w-full p-2 mb-4 border rounded"
+            />
+            <textarea
+              placeholder="Emails (comma-separated)"
+              value={newProductData.emailsText}
+              onChange={(e) =>
+                setNewProductData({
+                  ...newProductData,
+                  emailsText: e.target.value,
+                })
+              }
+              className="w-full p-2 mb-4 border rounded"
+            />
+            <select
+              value={newProductData.categoryId}
+              onChange={(e) =>
+                setNewProductData({
+                  ...newProductData,
+                  categoryId: e.target.value,
+                })
+              }
+              className="w-full p-2 mb-4 border rounded"
+            >
+              <option value="">Select Category</option>
+              {categories.map((category) => (
+                <option key={category._id} value={category._id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+            <div className="flex items-center space-x-4">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={newProductData.isAvailable}
+                  onChange={() =>
+                    setNewProductData({
+                      ...newProductData,
+                      isAvailable: !newProductData.isAvailable,
+                    })
+                  }
+                />
+                Available
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={newProductData.allowPreOrder}
+                  onChange={() =>
+                    setNewProductData({
+                      ...newProductData,
+                      allowPreOrder: !newProductData.allowPreOrder,
+                    })
+                  }
+                />
+                Allow Pre-Order
+              </label>
+            </div>
+          </div>
         </Modal>
       )}
 
-      {showDeleteModal && (
+      {/* Delete Product Modal */}
+      {showDeleteModal && selectedProduct && (
         <Modal
           title="Delete Product"
           onClose={() => setShowDeleteModal(false)}
           onConfirm={handleConfirmDelete}
           confirmText="Delete"
         >
-          Are you sure you want to delete this product?
+          <div>
+            Are you sure you want to delete{" "}
+            <strong>{selectedProduct.name}</strong>?
+          </div>
         </Modal>
       )}
 
-      {showHistoryModal && selectedProduct && (
+      {/* History Modal */}
+      {showHistoryModal && (
         <Modal
-          title={`History for ${selectedProduct.name}`}
+          title="Product History"
           onClose={() => setShowHistoryModal(false)}
         >
-          {productHistory.length > 0 ? (
-            <ul>
-              {productHistory.map((entry) => (
-                <li key={entry._id}>
-                  <p>{new Date(entry.timestamp).toLocaleString()}</p>
-                  <p>{entry.details}</p>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>No history available.</p>
-          )}
+          <div>
+            {productHistory.length > 0 ? (
+              <ul>
+                {productHistory.map((entry) => (
+                  <li key={entry._id}>
+                    <p className="font-bold">{entry.action}</p>
+                    <p>{entry.timestamp}</p>
+                    <p>{entry.details}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No history available.</p>
+            )}
+          </div>
         </Modal>
       )}
-    </div>
-  );
-}
-
-function ProductForm({
-  productData,
-  setProductData,
-  categories,
-}: {
-  productData: any;
-  setProductData: React.Dispatch<React.SetStateAction<any>>;
-  categories: Category[]; // Pass categories as a prop
-}) {
-  return (
-    <div className="grid grid-cols-1 gap-4">
-      <input
-        type="text"
-        value={productData.name}
-        onChange={(e) =>
-          setProductData({ ...productData, name: e.target.value })
-        }
-        placeholder="Product Name"
-        className="p-3 border border-gray-300 rounded"
-      />
-      <textarea
-        value={productData.description}
-        onChange={(e) =>
-          setProductData({ ...productData, description: e.target.value })
-        }
-        placeholder="Description"
-        className="p-3 border border-gray-300 rounded resize-y"
-        rows={3}
-      />
-      <input
-        type="number"
-        value={productData.price}
-        onChange={(e) =>
-          setProductData({ ...productData, price: e.target.value })
-        }
-        placeholder="Price"
-        className="p-3 border border-gray-300 rounded"
-      />
-      <textarea
-        value={productData.emailsText}
-        onChange={(e) =>
-          setProductData({ ...productData, emailsText: e.target.value })
-        }
-        placeholder="Emails (comma-separated)"
-        className="p-3 border border-gray-300 rounded resize-y"
-        rows={3}
-      />
-      <select
-        value={productData.categoryId}
-        onChange={(e) =>
-          setProductData({ ...productData, categoryId: e.target.value })
-        }
-        className="p-3 border border-gray-300 rounded"
-      >
-        <option value="">Select Category</option>
-        {categories.map((category) => (
-          <option key={category._id} value={category._id}>
-            {category.name}
-          </option>
-        ))}
-      </select>
-      <div className="flex items-center space-x-3">
-        <input
-          type="checkbox"
-          checked={productData.isAvailable}
-          onChange={(e) =>
-            setProductData({ ...productData, isAvailable: e.target.checked })
-          }
-        />
-        <label>Available</label>
-      </div>
-      <div className="flex items-center space-x-3">
-        <input
-          type="checkbox"
-          checked={productData.allowPreOrder}
-          onChange={(e) =>
-            setProductData({ ...productData, allowPreOrder: e.target.checked })
-          }
-        />
-        <label>Allow Pre-Order</label>
-      </div>
     </div>
   );
 }
