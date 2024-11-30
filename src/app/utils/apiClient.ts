@@ -7,6 +7,7 @@ export const apiClient = {
   get: async (endpoint: string) => {
     const response = await fetch(`${BASE_URL}${endpoint}`, {
       method: "GET",
+      headers: { "Content-Type": "application/json" },
       // Remove 'credentials: "include"' if not needed
     });
     if (!response.ok) {

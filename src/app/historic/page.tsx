@@ -3,6 +3,13 @@
 import React, { useState, useEffect } from "react";
 import { apiClient } from "../utils/apiClient";
 
+interface User {
+  _id: string;
+  telegramId: string;
+  username: string;
+  fullName?: string;
+} 
+
 interface HistoricEntry {
   _id: string;
   entity: string;
@@ -17,47 +24,99 @@ interface HistoricEntry {
   metadata?: Record<string, any>;
 }
 
-export default function HistoricPage() {
+const HistoricPage: React.FC = () => {
   const [historicEntries, setHistoricEntries] = useState<HistoricEntry[]>([]);
-  const [filteredEntries, setFilteredEntries] = useState<HistoricEntry[]>([]);
-  const [filters, setFilters] = useState({
-    search: "",
-    action: "",
-    entity: "",
-  });
+  const [userData, setUserData] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("all"); // Active section tracker
 
-  // Fetch historic entries
+  const categories = [
+    "all",
+    "notification",
+    "user",
+    "product",
+    "category",
+    "preorder",
+    "purchase",
+  ];
+
+  const filteredEntries =
+    activeTab === "all"
+      ? historicEntries
+      : historicEntries.filter(
+          (entry) => entry.entity.toLowerCase() === activeTab
+        );
+
   useEffect(() => {
-    fetchHistoricEntries();
+    fetchData();
   }, []);
 
-  const fetchHistoricEntries = async () => {
+  const fetchData = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await apiClient.get("/historic");
-      setHistoricEntries(response);
-      setFilteredEntries(response);
+
+      // Fetch historic data
+      const [historicResponse, userResponse] = await Promise.all([
+        apiClient.get("/historic"),
+        apiClient.get("/users"),
+      ]);
+
+      setHistoricEntries(historicResponse);
+      setUserData(userResponse);
     } catch (err: any) {
-      setError("Error fetching historic entries. Please try again later.");
-      console.error("Error fetching historic entries:", err.message);
+      setError("Error fetching data. Please try again later.");
+      console.error("Error fetching data:", err.message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleFilterChange = (field: string, value: string) => {
-    setFilters((prev) => ({ ...prev, [field]: value }));
-    const filtered = historicEntries.filter(
-      (entry) =>
-        entry.details.toLowerCase().includes(filters.search.toLowerCase()) &&
-        entry.action.toLowerCase().includes(filters.action.toLowerCase()) &&
-        entry.entity.toLowerCase().includes(filters.entity.toLowerCase())
-    );
-    setFilteredEntries(filtered);
+  const getUserName = (userId: string | null): string => {
+    if (!userId) return "Unknown User";
+    const user = userData.find((user) => user._id === userId);
+    return user?.fullName || user?.username || "Unknown User";
   };
+
+  const renderTable = (entries: HistoricEntry[]) => (
+    <div className="overflow-x-auto">
+      <table className="min-w-full bg-white border border-gray-200">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="text-left p-4 border-b">Entity</th>
+            <th className="text-left p-4 border-b">Action</th>
+            <th className="text-left p-4 border-b">Performed By</th>
+            <th className="text-left p-4 border-b">Details</th>
+            <th className="text-left p-4 border-b">Timestamp</th>
+          </tr>
+        </thead>
+        <tbody>
+          {entries.length === 0 ? (
+            <tr>
+              <td colSpan={5} className="p-4 text-center text-gray-500">
+                No records found for this section.
+              </td>
+            </tr>
+          ) : (
+            entries.map((entry) => (
+              <tr key={entry._id} className="hover:bg-gray-50">
+                <td className="p-4 border-b">{entry.entity}</td>
+                <td className="p-4 border-b">{entry.action}</td>
+                <td className="p-4 border-b capitalize">
+                  {getUserName(entry.performedBy.id)}
+                </td>
+                <td className="p-4 border-b">{entry.details}</td>
+                <td className="p-4 border-b">
+                  {new Date(entry.timestamp).toLocaleString()}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
@@ -69,70 +128,37 @@ export default function HistoricPage() {
         <p className="text-red-500">{error}</p>
       ) : (
         <>
-          {/* Filters */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <input
-              type="text"
-              placeholder="Search by details..."
-              value={filters.search}
-              onChange={(e) => handleFilterChange("search", e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="text"
-              placeholder="Filter by action..."
-              value={filters.action}
-              onChange={(e) => handleFilterChange("action", e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="text"
-              placeholder="Filter by entity..."
-              value={filters.entity}
-              onChange={(e) => handleFilterChange("entity", e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          {/* Tabs for categories */}
+          <div className="flex flex-wrap gap-4 mb-6">
+            {categories.map((category) => (
+              <button
+                key={category}
+                onClick={() => setActiveTab(category)}
+                className={`px-4 py-2 rounded-lg text-white ${
+                  activeTab === category
+                    ? "bg-blue-500"
+                    : "bg-gray-300 hover:bg-gray-400"
+                }`}
+              >
+                {category.charAt(0).toUpperCase() + category.slice(1)}
+              </button>
+            ))}
           </div>
 
-          {/* Responsive Table */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white border border-gray-200">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="text-left p-4 border-b">Entity</th>
-                  <th className="text-left p-4 border-b">Action</th>
-                  <th className="text-left p-4 border-b">Performed By</th>
-                  <th className="text-left p-4 border-b">Details</th>
-                  <th className="text-left p-4 border-b">Timestamp</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredEntries.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="p-4 text-center text-gray-500">
-                      No historic records match your filters.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredEntries.map((entry) => (
-                    <tr key={entry._id} className="hover:bg-gray-50">
-                      <td className="p-4 border-b">{entry.entity}</td>
-                      <td className="p-4 border-b">{entry.action}</td>
-                      <td className="p-4 border-b capitalize">
-                        {entry.performedBy.type} (ID: {entry.performedBy.id})
-                      </td>
-                      <td className="p-4 border-b">{entry.details}</td>
-                      <td className="p-4 border-b">
-                        {new Date(entry.timestamp).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          {/* Render active tab */}
+          {activeTab === "purchase" && (
+            <div className="mb-4">
+              <p className="text-lg font-medium">
+                Total Purchases: {filteredEntries.length}
+              </p>
+            </div>
+          )}
+
+          <div>{renderTable(filteredEntries)}</div>
         </>
       )}
     </div>
   );
-}
+};
+
+export default HistoricPage;

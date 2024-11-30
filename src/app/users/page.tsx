@@ -4,10 +4,13 @@ import React, { useState, useEffect } from "react";
 import { apiClient } from "../utils/apiClient";
 import {
   FaEdit,
-  FaHistory,
   FaUserCheck,
   FaUserTimes,
   FaSpinner,
+  FaSearch,
+  FaHistory,
+  FaPlusCircle,
+  FaTrash,
 } from "react-icons/fa";
 
 interface User {
@@ -21,15 +24,13 @@ interface User {
   registerDate: string;
   isActive: boolean;
   isAccepted: boolean;
-}
-
-interface HistoryEntry {
-  _id: string;
-  entity: string;
-  action: string;
-  timestamp: string;
-  details: string;
-  metadata?: Record<string, any>;
+  history: Array<{
+    amount: number;
+    date: string;
+    description: string;
+    type: string;
+    productName?: string;
+  }>;
 }
 
 const Modal = ({
@@ -41,41 +42,70 @@ const Modal = ({
   children: React.ReactNode;
   onClose: () => void;
 }) => (
-  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
-    <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-screen overflow-y-auto">
-      <h2 className="text-2xl font-bold mb-4">{title}</h2>
-      {children}
-      <div className="flex justify-end mt-4">
-        <button
-          onClick={onClose}
-          className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition"
-        >
-          Close
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+    <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+      <div className="p-6 border-b flex justify-between items-center">
+        <h2 className="text-2xl font-bold">{title}</h2>
+        <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+          ✕
         </button>
       </div>
+      <div className="p-6">{children}</div>
     </div>
   </div>
 );
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortConfig, setSortConfig] = useState<{
+    key: keyof User;
+    direction: "ascending" | "descending";
+  }>({ key: "registerDate", direction: "descending" });
   const [balanceInput, setBalanceInput] = useState("");
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [userHistory, setUserHistory] = useState<HistoryEntry[]>([]);
-
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showAddBalanceModal, setShowAddBalanceModal] = useState(false);
+  console.log(users);
+  // Fetch users on component mount
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  // Filter and sort users
+  useEffect(() => {
+    let result = [...users];
+    if (searchTerm) {
+      result = result.filter(
+        (user) =>
+          user.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          user.telegramId.includes(searchTerm) ||
+          user.phoneNumber?.includes(searchTerm)
+      );
+    }
+
+    result.sort((a: any, b: any) => {
+      const valueA = a[sortConfig.key];
+      const valueB = b[sortConfig.key];
+      if (valueA < valueB) return sortConfig.direction === "ascending" ? -1 : 1;
+      if (valueA > valueB) return sortConfig.direction === "ascending" ? 1 : -1;
+      return 0;
+    });
+
+    setFilteredUsers(result);
+  }, [users, searchTerm, sortConfig]);
 
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
       const response = await apiClient.get("/users");
       setUsers(response);
+      setFilteredUsers(response);
     } catch (error) {
       console.error("Error fetching users:", error);
     } finally {
@@ -83,205 +113,302 @@ export default function UsersPage() {
     }
   };
 
-  const fetchUserHistory = async (userId: string) => {
-    try {
-      setIsUpdating(true);
-      const response = await apiClient.get(`/historic/user/${userId}`);
-      setUserHistory(response);
-      setShowHistoryModal(true);
-    } catch (error) {
-      console.error("Error fetching user history:", error);
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const handleUpdateBalance = async () => {
+  const handleAddBalance = async () => {
     if (selectedUser && balanceInput) {
       const amount = parseInt(balanceInput);
       setIsUpdating(true);
       try {
-        await apiClient.put(`/users/${selectedUser._id}/balance`, { amount });
+        await apiClient.put(`/users/${selectedUser._id}/balance`, {
+          amount,
+        });
         await fetchUsers();
         setBalanceInput("");
-        setShowEditModal(false);
+        setShowAddBalanceModal(false);
       } catch (error) {
-        console.error("Error updating balance:", error);
+        console.error("Error adding balance:", error);
       } finally {
         setIsUpdating(false);
       }
     }
   };
+  const handleDeleteUser = async () => {
+    if (userToDelete) {
+      try {
+        await apiClient.delete(`/users/${userToDelete._id}`);
+        await fetchUsers(); // Refresh user list after deletion
+        setShowDeleteModal(false); // Close modal
+        setUserToDelete(null); // Reset user to delete
+      } catch (error) {
+        console.error("Error deleting user:", error);
+      }
+    }
+  };
 
-  const handleAcceptUser = async (userId: string) => {
+  const handleUserAction = async (userId: string, isAccepted: boolean) => {
     setIsUpdating(true);
     try {
-      await apiClient.put(`/users/${userId}`, { isAccepted: true });
+      await apiClient.put(`/users/${userId}`, { isAccepted });
       await fetchUsers();
     } catch (error) {
-      console.error("Error accepting user:", error);
+      console.error(
+        `Error ${isAccepted ? "accepting" : "rejecting"} user:`,
+        error
+      );
     } finally {
       setIsUpdating(false);
     }
   };
 
-  const handleRejectUser = async (userId: string) => {
-    setIsUpdating(true);
-    try {
-      await apiClient.put(`/users/${userId}`, { isAccepted: false });
-      await fetchUsers();
-    } catch (error) {
-      console.error("Error rejecting user:", error);
-    } finally {
-      setIsUpdating(false);
-    }
+  const handleViewHistory = (user: User) => {
+    setSelectedUser(user);
+    setShowHistoryModal(true);
+  };
+  const DeleteConfirmationModal = ({
+    title = "Confirm Delete",
+    message = "Are you sure you want to delete this item? This action cannot be undone.",
+    isOpen,
+    onConfirm,
+    onCancel,
+  }: {
+    title?: string;
+    message?: string;
+    isOpen: boolean;
+    onConfirm: () => void;
+    onCancel: () => void;
+  }) => {
+    if (!isOpen) return null;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+          <div className="p-6 border-b flex justify-between items-center">
+            <h2 className="text-xl font-bold">{title}</h2>
+            <button
+              onClick={onCancel}
+              className="text-gray-500 hover:text-gray-700 focus:outline-none"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="p-6">
+            <p className="text-gray-700">{message}</p>
+            <div className="flex justify-end mt-6 space-x-4">
+              <button
+                onClick={onCancel}
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 focus:outline-none"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={onConfirm}
+                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 focus:outline-none"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h1 className="text-3xl font-bold mb-6 text-center">User Management</h1>
-
-      {isLoading ? (
-        <div className="flex justify-center">
-          <FaSpinner className="animate-spin text-gray-500" size={36} />
+    <div className="container mx-auto px-4 py-8">
+      <div className="bg-white shadow-md rounded-lg overflow-hidden">
+        {/* Header */}
+        <div className="p-4 bg-gray-100 flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-gray-800">User Management</h1>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 border rounded-lg w-64"
+            />
+            <FaSearch className="absolute left-3 top-3 text-gray-400" />
+          </div>
         </div>
-      ) : (
+
+        {/* Table */}
         <div className="overflow-x-auto">
-          <table className="min-w-full bg-white border border-gray-200">
+          <table className="w-full">
             <thead className="bg-gray-100">
               <tr>
-                <th className="text-left p-4 border-b">Telegram ID</th>
-                <th className="text-left p-4 border-b">Username</th>
-                <th className="text-left p-4 border-b">Full Name</th>
-                <th className="text-left p-4 border-b">Phone Number</th>
-                <th className="text-left p-4 border-b">Balance</th>
-                <th className="text-left p-4 border-b">Total Recharge</th>
-                <th className="text-left p-4 border-b">Accepted</th>
-                <th className="text-left p-4 border-b">Actions</th>
+                <th className="p-4 text-left">Telegram ID</th>
+                <th className="p-4 text-left">Full Name</th>
+                <th className="p-4 text-left">Phone Number</th>
+                <th className="p-4 text-left">Balance</th>
+                <th className="p-4 text-left">Total Recharge</th>
+                <th className="p-4 text-left">Status</th>
+                <th className="p-4 text-left">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
-                <tr key={user._id} className="hover:bg-gray-50">
-                  <td className="p-4 border-b">{user.telegramId}</td>
-                  <td className="p-4 border-b">@{user.username}</td>
-                  <td className="p-4 border-b">{user.fullName || "N/A"}</td>
-                  <td className="p-4 border-b">{user.phoneNumber || "N/A"}</td>
-                  <td className="p-4 border-b text-green-600 font-semibold">
-                    {user.balance} Units
-                  </td>
-                  <td className="p-4 border-b text-blue-600 font-semibold">
-                    {user.totalRecharge} Units
-                  </td>
-                  <td className="p-4 border-b">
-                    {user.isAccepted ? (
-                      <span className="text-green-600 font-semibold">Yes</span>
-                    ) : (
-                      <span className="text-red-600 font-semibold">No</span>
-                    )}
-                  </td>
-                  <td className="p-4 border-b flex space-x-4">
-                    {!user.isAccepted ? (
-                      <button
-                        onClick={() => handleAcceptUser(user._id)}
-                        className="text-green-600 hover:text-green-800"
-                        title="Accept User"
-                      >
-                        <FaUserCheck size={24} />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleRejectUser(user._id)}
-                        className="text-yellow-600 hover:text-yellow-800"
-                        title="Reject User"
-                      >
-                        <FaUserTimes size={24} />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        setSelectedUser(user);
-                        setShowEditModal(true);
-                      }}
-                      className="text-blue-600 hover:text-blue-800"
-                      title="Adjust Balance"
-                    >
-                      <FaEdit size={24} />
-                    </button>
-                    <button
-                      onClick={async () => {
-                        setSelectedUser(user);
-                        await fetchUserHistory(user._id);
-                      }}
-                      className="text-gray-600 hover:text-gray-800"
-                      title="View History"
-                    >
-                      <FaHistory size={24} />
-                    </button>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="text-center p-4">
+                    <FaSpinner className="animate-spin mx-auto" />
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredUsers.map((user) => (
+                  <tr key={user._id} className="border-b hover:bg-gray-50">
+                    <td className="p-4">{user.telegramId}</td>
+                    <td className="p-4">{user.fullName || "N/A"}</td>
+                    <td className="p-4">{user.phoneNumber || "N/A"}</td>
+                    <td className="p-4 text-green-600 font-semibold">
+                      {user.balance} Units
+                    </td>
+                    <td className="p-4 text-blue-600 font-semibold">
+                      {user.totalRecharge} Units
+                    </td>
+                    <td className="p-4">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs ${
+                          user.isAccepted
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
+                        {user.isAccepted ? "Accepted" : "Pending"}
+                      </span>
+                    </td>
+                    <td className="p-4 flex space-x-2 items-center">
+                      {/* Accept/Reject User */}
+                      {user.isAccepted ? (
+                        <button
+                          onClick={() => handleUserAction(user._id, false)}
+                          className="text-yellow-500 hover:text-yellow-700"
+                          title="Reject User"
+                        >
+                          <FaUserTimes />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleUserAction(user._id, true)}
+                          className="text-green-500 hover:text-green-700"
+                          title="Accept User"
+                        >
+                          <FaUserCheck />
+                        </button>
+                      )}
+                      {/* View History */}
+                      <button
+                        onClick={() => handleViewHistory(user)}
+                        className="text-gray-500 hover:text-gray-700"
+                        title="View History"
+                      >
+                        <FaHistory />
+                      </button>
+                      {/* Add Balance */}
+                      <button
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setShowAddBalanceModal(true);
+                        }}
+                        className="text-blue-500 hover:text-blue-700"
+                        title="Add Balance"
+                      >
+                        <FaPlusCircle />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setUserToDelete(user); // Set the user to delete
+                          setShowDeleteModal(true); // Show the delete modal
+                        }}
+                      >
+                        <FaTrash />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
-      )}
+      </div>
 
-      {showEditModal && selectedUser && (
+      {/* Add Balance Modal */}
+      {showAddBalanceModal && selectedUser && (
         <Modal
-          title={`Adjust Balance for ${
-            selectedUser.fullName || selectedUser.username
-          }`}
-          onClose={() => setShowEditModal(false)}
+          title="Add Balance"
+          onClose={() => setShowAddBalanceModal(false)}
         >
-          <input
-            type="number"
-            value={balanceInput}
-            onChange={(e) => setBalanceInput(e.target.value)}
-            placeholder="Enter amount (+/-)"
-            className="w-full p-2 border border-gray-300 rounded mb-4"
-          />
-          <button
-            onClick={handleUpdateBalance}
-            className="bg-blue-500 text-white px-4 py-2 rounded w-full"
-          >
-            {isUpdating ? <FaSpinner className="animate-spin" /> : "Update"}
-          </button>
+          <div>
+            <label className="block text-sm font-semibold">Enter Amount</label>
+            <input
+              type="number"
+              value={balanceInput}
+              onChange={(e) => setBalanceInput(e.target.value)}
+              className="w-full p-2 border rounded"
+            />
+            <div className="flex justify-end mt-4 space-x-4">
+              <button
+                onClick={() => setShowAddBalanceModal(false)}
+                className="bg-gray-300 text-gray-700 p-2 rounded"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddBalance}
+                className="bg-blue-500 text-white p-2 rounded"
+              >
+                {isUpdating ? (
+                  <FaSpinner className="animate-spin" />
+                ) : (
+                  "Add Balance"
+                )}
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
 
-      {showHistoryModal && selectedUser && (
-        <Modal
-          title={`History for ${
-            selectedUser.fullName || selectedUser.username
-          }`}
-          onClose={() => setShowHistoryModal(false)}
-        >
-          {userHistory.length > 0 ? (
-            <table className="w-full border">
-              <thead>
-                <tr className="bg-gray-100 text-left">
-                  <th className="p-2">Date</th>
-                  <th className="p-2">Action</th>
-                  <th className="p-2">Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {userHistory.map((entry) => (
-                  <tr key={entry._id} className="border-b">
-                    <td className="p-2">
-                      {new Date(entry.timestamp).toLocaleString()}
-                    </td>
-                    <td className="p-2">{entry.action}</td>
-                    <td className="p-2">{entry.details}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p>No history available.</p>
-          )}
+      {/* User History Modal */}
+      {showHistoryModal && selectedUser && selectedUser.history && (
+        <Modal title="User History" onClose={() => setShowHistoryModal(false)}>
+          <div>
+            <h3 className="text-xl font-semibold">
+              History for {selectedUser.fullName}
+            </h3>
+            <ul className="mt-4 space-y-4">
+              {selectedUser.history.length > 0 ? (
+                selectedUser.history.map((entry, index) => (
+                  <li key={index} className="border-b pb-2">
+                    <p className="font-bold text-sm">
+                      {entry.type === "charge"
+                        ? "Added Balance"
+                        : "Purchased Product"}
+                    </p>
+                    <p>{entry.description}</p>
+                    <p className="text-sm text-gray-500">
+                      Date: {new Date(entry.date).toLocaleString()}
+                    </p>
+                    {entry.productName && <p>Product: {entry.productName}</p>}
+                    <p className="font-bold">{entry.amount} Units</p>
+                  </li>
+                ))
+              ) : (
+                <p>No history available for this user.</p>
+              )}
+            </ul>
+          </div>
+        </Modal>
+      )}
+      {showDeleteModal && selectedUser && (
+        <Modal title="Delete User" onClose={() => setShowDeleteModal(false)}>
+          <DeleteConfirmationModal
+            title="Delete User"
+            message={`Are you sure you want to delete ${
+              userToDelete?.fullName || "this user"
+            }?`}
+            isOpen={showDeleteModal}
+            onConfirm={handleDeleteUser}
+            onCancel={() => setShowDeleteModal(false)}
+          />
         </Modal>
       )}
     </div>
   );
 }
+[];
