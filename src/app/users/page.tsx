@@ -148,18 +148,20 @@ export default function UsersPage() {
     }
 
     // Apply search filter
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      result = result.filter(
-        (user) =>
-          user.fullName?.toLowerCase().includes(searchLower) ||
-          user.name.toLowerCase().includes(searchLower) ||
-          user.username.toLowerCase().includes(searchLower) ||
-          user.telegramId.includes(searchTerm) ||
-          user.phoneNumber?.includes(searchTerm) ||
-          user.chatId.includes(searchTerm)
-      );
-    }
+ // Apply search filter
+if (searchTerm) {
+  const searchLower = searchTerm.toLowerCase();
+  result = result.filter((user) => {
+    return (
+      (user.fullName && user.fullName.toLowerCase().includes(searchLower)) ||
+      (user.name.toLowerCase().includes(searchLower)) ||
+      (user.username.toLowerCase().includes(searchLower)) ||
+      (user.telegramId && user.telegramId.includes(searchTerm)) || // Check if telegramId is defined
+      (user.phoneNumber && user.phoneNumber.includes(searchTerm)) || // Check if phoneNumber is defined
+      (user.chatId && user.chatId.includes(searchTerm)) // Check if chatId is defined
+    );
+  });
+}
 
     // Apply sorting
     result.sort((a: any, b: any) => {
