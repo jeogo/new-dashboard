@@ -624,31 +624,24 @@ export default function ProductsPage() {
     }
   };
 
+  const MAX_EMAILS_PER_REQUEST = 100; // Send 100 emails per request
+
   const confirmAddEmails = async () => {
     if (!selectedProduct || emailsToAdd.length === 0) return;
-
+  
     try {
-      const updatedEmails = [...selectedProduct.emails, ...emailsToAdd];
-      const response = await apiClient.put(`/products/${selectedProduct._id}`, {
-        ...selectedProduct,
-        emails: updatedEmails,
-      });
-
-      if (!response) {
-        throw new Error("Failed to update product");
+      for (let i = 0; i < emailsToAdd.length; i += MAX_EMAILS_PER_REQUEST) {
+        const chunk = emailsToAdd.slice(i, i + MAX_EMAILS_PER_REQUEST);
+        await apiClient.put(`/products/${selectedProduct._id}`, {
+          emails: chunk,
+        });
       }
-
-      setSelectedProduct({
-        ...selectedProduct,
-        emails: updatedEmails,
-      });
-
-      setProducts((prevProducts) =>
-        prevProducts.map((p) =>
-          p._id === selectedProduct._id ? { ...p, emails: updatedEmails } : p
-        )
+  
+      // Update local state
+      setSelectedProduct((prev) =>
+        prev ? { ...prev, emails: [...prev.emails, ...emailsToAdd] } : null
       );
-
+  
       setNewEmail("");
       setEmailsToAdd([]);
       setShowEmailConfirmModal(false);
