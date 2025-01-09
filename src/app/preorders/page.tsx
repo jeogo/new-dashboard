@@ -26,7 +26,9 @@ export default function PreOrdersPage() {
   const [filteredPreOrders, setFilteredPreOrders] = useState<PreOrder[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedPreOrder, setSelectedPreOrder] = useState<PreOrder | null>(null);
+  const [selectedPreOrder, setSelectedPreOrder] = useState<PreOrder | null>(
+    null
+  );
   const [action, setAction] = useState<"fulfilled" | "canceled" | null>(null);
   const [emailPassword, setEmailPassword] = useState<string>("");
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
@@ -45,7 +47,9 @@ export default function PreOrdersPage() {
 
     // Filter by status
     if (selectedStatus !== "all") {
-      filtered = filtered.filter((preOrder) => preOrder.status === selectedStatus);
+      filtered = filtered.filter(
+        (preOrder) => preOrder.status === selectedStatus
+      );
     }
 
     // Filter by search term
@@ -54,12 +58,16 @@ export default function PreOrdersPage() {
       filtered = filtered.filter(
         (preOrder) =>
           preOrder.productName.toLowerCase().includes(searchLower) ||
-          (preOrder.fullName || preOrder.userName).toLowerCase().includes(searchLower)
+          (preOrder.fullName || preOrder.userName)
+            .toLowerCase()
+            .includes(searchLower)
       );
     }
 
     // Sort by date (newest to oldest)
-    filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    filtered.sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
 
     setFilteredPreOrders(filtered);
     setCurrentPage(1); // Reset to the first page when filters change
@@ -79,24 +87,37 @@ export default function PreOrdersPage() {
     }
   };
 
-  const updatePreOrderStatus = async (preOrderId: string, status: string, emailPassword?: string) => {
+  const updatePreOrderStatus = async (
+    preOrderId: string,
+    status: string,
+    emailPassword?: string
+  ) => {
     try {
       setError(null);
-      await apiClient.put(`/preorders/${preOrderId}/status`, { status, emailPassword });
+      await apiClient.put(`/preorders/${preOrderId}/status`, {
+        status,
+        emailPassword,
+      });
       await fetchPreOrders();
     } catch (error: any) {
       setError(`Error updating pre-order status to ${status}.`);
-      console.error(`Error updating pre-order status to ${status}:`, error.message);
+      console.error(
+        `Error updating pre-order status to ${status}:`,
+        error.message
+      );
     }
   };
-
   const handleActionConfirm = () => {
     if (selectedPreOrder && action) {
       if (action === "fulfilled" && !emailPassword) {
         setError("Email and password are required for fulfillment.");
         return;
       }
-      updatePreOrderStatus(selectedPreOrder._id, action, action === "fulfilled" ? emailPassword : undefined);
+      updatePreOrderStatus(
+        selectedPreOrder._id,
+        action,
+        action === "fulfilled" ? emailPassword : undefined
+      );
       setSelectedPreOrder(null);
       setAction(null);
       setEmailPassword("");
@@ -129,14 +150,19 @@ export default function PreOrdersPage() {
   // Pagination logic
   const totalPages = Math.ceil(filteredPreOrders.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedOrders = filteredPreOrders.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedOrders = filteredPreOrders.slice(
+    startIndex,
+    startIndex + itemsPerPage
+  );
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="bg-white shadow-md rounded-lg overflow-hidden">
         {/* Header */}
         <div className="p-6 border-b flex flex-col sm:flex-row justify-between items-center gap-4">
-          <h1 className="text-2xl font-bold text-gray-800">Pre-Orders Management</h1>
+          <h1 className="text-2xl font-bold text-gray-800">
+            Pre-Orders Management
+          </h1>
           <button
             onClick={fetchPreOrders}
             className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
@@ -211,7 +237,9 @@ export default function PreOrdersPage() {
         ) : error ? (
           <div className="p-6 text-red-500">{error}</div>
         ) : paginatedOrders.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">No pre-orders found.</div>
+          <div className="p-6 text-center text-gray-500">
+            No pre-orders found.
+          </div>
         ) : (
           <div className="space-y-4 p-6">
             {paginatedOrders.map((preOrder) => (
@@ -234,11 +262,13 @@ export default function PreOrdersPage() {
                           preOrder.status
                         )}`}
                       >
-                        {preOrder.status.charAt(0).toUpperCase() + preOrder.status.slice(1)}
+                        {preOrder.status.charAt(0).toUpperCase() +
+                          preOrder.status.slice(1)}
                       </span>
                     </div>
                     <p className="text-sm text-gray-600 mt-1">
-                      {preOrder.fullName || preOrder.userName} | {new Date(preOrder.date).toLocaleString()}
+                      {preOrder.fullName || preOrder.userName} ||{" "}
+                      {new Date(preOrder.date).toLocaleString()}
                     </p>
                   </div>
                   {preOrder.status === "pending" && (
@@ -271,21 +301,53 @@ export default function PreOrdersPage() {
                 {expandedOrders.has(preOrder._id) && (
                   <div className="p-6 bg-gray-50 border-t grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <h4 className="font-semibold mb-2 text-gray-700">Order Details</h4>
+                      <h4 className="font-semibold mb-2 text-gray-700">
+                        Order Details
+                      </h4>
                       <div className="space-y-2 text-sm text-gray-600">
-                        <p><strong>Full Name:</strong> {preOrder.fullName || preOrder.userName}</p>
-                        <p><strong>Product Price:</strong> ${preOrder.productPrice.toFixed(2)}</p>
-                        <p><strong>Order Date:</strong> {new Date(preOrder.date).toLocaleString()}</p>
+                        <p>
+                          <strong>Full Name:</strong>{" "}
+                          {preOrder.fullName || preOrder.userName}
+                        </p>
+                        <p>
+                          <strong>Product Price:</strong> $
+                          {preOrder.productPrice.toFixed(2)}
+                        </p>
+                        <p>
+                          <strong>Order Date:</strong>{" "}
+                          {new Date(preOrder.date).toLocaleString()}
+                        </p>
                       </div>
                     </div>
                     <div>
-                      <h4 className="font-semibold mb-2 text-gray-700">Additional Information</h4>
+                      <h4 className="font-semibold mb-2 text-gray-700">
+                        Additional Information
+                      </h4>
                       <div className="space-y-2 text-sm text-gray-600">
-                        {preOrder.message && <p><strong>Message:</strong> {preOrder.message}</p>}
-                        {preOrder.clientMessage && <p><strong>Client Message:</strong> {preOrder.clientMessage}</p>}
-                        {preOrder.clientMessageData && <p><strong>Client Message Data:</strong> {preOrder.clientMessageData}</p>}
+                        {preOrder.message && (
+                          <p>
+                            <strong>Message:</strong> {preOrder.message}
+                          </p>
+                        )}
+                        {preOrder.clientMessage && (
+                          <p>
+                            <strong>Client Message:</strong>{" "}
+                            {preOrder.clientMessage}
+                          </p>
+                        )}
+                        {preOrder.clientMessageData && (
+                          <p>
+                            <strong>Client Message Data:</strong>{" "}
+                            {preOrder.clientMessageData}
+                          </p>
+                        )}
                         {preOrder.fulfillmentDate && (
-                          <p><strong>Fulfillment Date:</strong> {new Date(preOrder.fulfillmentDate).toLocaleString()}</p>
+                          <p>
+                            <strong>Fulfillment Date:</strong>{" "}
+                            {new Date(
+                              preOrder.fulfillmentDate
+                            ).toLocaleString()}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -310,7 +372,9 @@ export default function PreOrdersPage() {
               Page {currentPage} of {totalPages}
             </span>
             <button
-              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
               disabled={currentPage === totalPages}
               className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition disabled:opacity-50"
             >
@@ -326,7 +390,9 @@ export default function PreOrdersPage() {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="p-6">
               <h2 className="text-xl font-bold mb-4">
-                {action === "fulfilled" ? "Confirm Fulfillment" : "Confirm Cancellation"}
+                {action === "fulfilled"
+                  ? "Confirm Fulfillment"
+                  : "Confirm Cancellation"}
               </h2>
               <p className="mb-4">
                 Are you sure you want to{" "}
@@ -334,7 +400,10 @@ export default function PreOrdersPage() {
                   {action === "fulfilled" ? "fulfill" : "cancel"}
                 </span>{" "}
                 this pre-order for{" "}
-                <span className="font-bold">{selectedPreOrder.productName}</span>?
+                <span className="font-bold">
+                  {selectedPreOrder.productName}
+                </span>
+                ?
               </p>
               {action === "fulfilled" && (
                 <textarea

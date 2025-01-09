@@ -5,9 +5,18 @@ import {
   ChevronRight,
   Filter,
   Search,
-  Calendar,
   SortAsc,
   SortDesc,
+  ArrowRight,
+  DollarSign,
+  ToggleLeft,
+  Calendar,
+  Mail,
+  Tag,
+  Package,
+  Folder,
+  User,
+  CreditCard,
 } from "lucide-react";
 import { apiClient } from "../utils/apiClient";
 
@@ -25,7 +34,18 @@ interface ClientHistoryEntry {
   message?: string;
   responseMessage?: string;
   fulfillmentDate?: Date;
-  emailSold?: string; // Added emailSold field
+  emailSold?: string;
+}
+
+interface UpdateField {
+  old?: string | number | boolean;
+  new?: string | number | boolean;
+  added?: string[];
+  removed?: string[];
+}
+
+interface UpdatedFields {
+  [key: string]: UpdateField;
 }
 
 interface AdminHistoryEntry {
@@ -42,7 +62,7 @@ interface AdminHistoryEntry {
     | "system";
   entityId?: string;
   entityName?: string;
-  updatedFields?: Record<string, any>;
+  updatedFields?: UpdatedFields;
   details?: string;
   target?: string;
   targetId?: string;
@@ -52,6 +72,10 @@ interface AdminHistoryEntry {
   message?: string;
   previousBalance?: number;
   newBalance?: number;
+  productDetails?: {
+    productName: string;
+    categoryName: string;
+  };
 }
 
 interface History {
@@ -76,6 +100,59 @@ type ActionFilter =
 type SortDirection = "asc" | "desc";
 
 const ITEMS_PER_PAGE = 10;
+
+// Utility functions
+const formatFieldName = (field: string): string => {
+  return field
+    .split(/(?=[A-Z])|_/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+};
+
+const formatBoolean = (value: boolean): string => {
+  return value ? "Available" : "Not Available";
+};
+
+const getFieldProperties = (
+  fieldName: string
+): {
+  icon: React.ReactNode;
+  colorClass: string;
+} => {
+  const properties = {
+    price: {
+      icon: <DollarSign className="w-4 h-4" />,
+      colorClass: "text-green-600",
+    },
+    isAvailable: {
+      icon: <ToggleLeft className="w-4 h-4" />,
+      colorClass: "text-blue-600",
+    },
+    allowPreOrder: {
+      icon: <Calendar className="w-4 h-4" />,
+      colorClass: "text-purple-600",
+    },
+    emails: {
+      icon: <Mail className="w-4 h-4" />,
+      colorClass: "text-orange-600",
+    },
+    name: {
+      icon: <Tag className="w-4 h-4" />,
+      colorClass: "text-gray-600",
+    },
+    default: {
+      icon: <Package className="w-4 h-4" />,
+      colorClass: "text-gray-600",
+    },
+  };
+
+  const key =
+    Object.keys(properties).find((k) =>
+      fieldName.toLowerCase().includes(k.toLowerCase())
+    ) || "default";
+
+  return properties[key as keyof typeof properties];
+};
 
 const HistoryDashboard = () => {
   // State management
@@ -139,7 +216,7 @@ const HistoryDashboard = () => {
                   fulfillmentDate: record.fulfillmentDate
                     ? new Date(record.fulfillmentDate)
                     : undefined,
-                  emailSold: record.emailSold, // Added emailSold field
+                  emailSold: record.emailSold,
                 }
               : {
                   action: record.action,
@@ -161,6 +238,7 @@ const HistoryDashboard = () => {
                   phoneNumber: record.phoneNumber,
                   previousBalance: record.previousBalance,
                   newBalance: record.newBalance,
+                  productDetails: record.productDetails,
                 },
         }));
 
@@ -181,18 +259,24 @@ const HistoryDashboard = () => {
   const filterAndSortHistory = () => {
     let filtered = history.filter((record) => {
       if (actionFilter === "all") return true;
-      if (actionFilter === "purchase") {
-        return (
-          record.type === "client" &&
-          (record.entry as ClientHistoryEntry).action === "purchase"
-        );
-      }
+
+      // Handle preorder filter (only "preorder", case-sensitive)
       if (actionFilter === "preorder") {
         return (
           record.type === "client" &&
           (record.entry as ClientHistoryEntry).action === "preorder"
         );
       }
+
+      // Handle purchase filter
+      if (actionFilter === "purchase") {
+        return (
+          record.type === "client" &&
+          (record.entry as ClientHistoryEntry).action === "purchase"
+        );
+      }
+
+      // Handle recharge-discount filter
       if (actionFilter === "recharge-discount") {
         return (
           record.type === "admin" &&
@@ -200,15 +284,19 @@ const HistoryDashboard = () => {
             (record.entry as AdminHistoryEntry).action === "Discount")
         );
       }
+
+      // Handle update filter
       if (actionFilter === "update") {
         return (
           record.type === "admin" &&
           (record.entry as AdminHistoryEntry).action === "update"
         );
       }
+
       return false;
     });
 
+    // Apply search term filter
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter((record) => {
@@ -228,6 +316,7 @@ const HistoryDashboard = () => {
       });
     }
 
+    // Apply date range filter
     if (dateRange.start || dateRange.end) {
       filtered = filtered.filter((record) => {
         const recordDate = new Date(record.entry.date);
@@ -239,6 +328,7 @@ const HistoryDashboard = () => {
       });
     }
 
+    // Apply sorting
     filtered.sort((a, b) => {
       const dateA = new Date(a.entry.date).getTime();
       const dateB = new Date(b.entry.date).getTime();
@@ -248,7 +338,105 @@ const HistoryDashboard = () => {
     setFilteredHistory(filtered);
     setCurrentPage(1);
   };
+  const renderUpdateFields = (
+    updatedFields: UpdatedFields,
+    productDetails?: AdminHistoryEntry["productDetails"]
+  ) => {
+    if (!updatedFields || Object.keys(updatedFields).length === 0) {
+      return null;
+    }
 
+    return (
+      <div className="space-y-4">
+        {productDetails && (
+          <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center space-x-2 mb-2">
+              <Package className="w-5 h-5 text-gray-600" />
+              <span className="font-medium">
+                {productDetails.productName || "Unknown Product"}
+              </span>
+            </div>
+            <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <Folder className="w-4 h-4" />
+              <span>{productDetails.categoryName || "Unknown Category"}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {Object.entries(updatedFields).map(([field, value]) => {
+            if (!value || typeof value !== "object") return null;
+
+            const { icon, colorClass } = getFieldProperties(field);
+            const fieldName = formatFieldName(field);
+
+            return (
+              <div key={field} className="bg-white rounded-lg p-4 shadow-sm">
+                <div className="flex items-center space-x-2 mb-2">
+                  <span className={colorClass}>{icon}</span>
+                  <span className="font-medium text-gray-900">{fieldName}</span>
+                </div>
+
+                <div className="pl-6 space-y-2">
+                  {/* Prices and Status (Old and New) */}
+                  {(field === "price" || field === "status") && (
+                    <div className="flex items-center space-x-2 text-sm">
+                      <span className="text-gray-600">
+                        {typeof value.old === "boolean"
+                          ? formatBoolean(value.old)
+                          : value.old}
+                      </span>
+                      <ArrowRight className="w-4 h-4 text-gray-400" />
+                      <span className="font-medium text-gray-900">
+                        {typeof value.new === "boolean"
+                          ? formatBoolean(value.new)
+                          : value.new}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Emails (Added and Removed) */}
+                  {field === "emails" && (
+                    <>
+                      {value.added && value.added.length > 0 && (
+                        <div className="text-sm text-gray-600">
+                          <span className="text-green-600 font-medium">
+                            Added Emails:{" "}
+                          </span>
+                          <ul className="list-disc pl-6">
+                            {value.added.map((email, index) => (
+                              <li key={index} className="text-green-700">
+                                {email}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {value.removed && value.removed.length > 0 && (
+                        <div className="text-sm text-gray-600">
+                          <span className="text-red-600 font-medium">
+                            Removed Emails:{" "}
+                          </span>
+                          <ul className="list-disc pl-6">
+                            {value.removed.map((email, index) => (
+                              <li key={index} className="text-red-700">
+                                {email}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
   const paginatedHistory = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredHistory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -256,31 +444,6 @@ const HistoryDashboard = () => {
 
   const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
 
-  // Render readable update fields
-  const renderUpdateFields = (updatedFields: Record<string, any>) => {
-    return Object.entries(updatedFields).map(([field, value]) => {
-      if (typeof value === "object" && value !== null) {
-        return (
-          <div key={field} className="space-y-2">
-            <p className="text-sm font-medium text-gray-900">{field}:</p>
-            {Object.entries(value).map(([subField, subValue]) => (
-              <div key={subField} className="text-sm text-gray-600 pl-4">
-                <span className="font-medium">{subField}:</span>{" "}
-                {Array.isArray(subValue) ? subValue.join(", ") : String(subValue)}
-              </div>
-            ))}
-          </div>
-        );
-      }
-      return (
-        <div key={field} className="text-sm text-gray-600">
-          <span className="font-medium">{field}:</span> {value}
-        </div>
-      );
-    });
-  };
-
-  // Render cards for history entries
   const renderHistoryCards = () => {
     return paginatedHistory.map((record) => {
       const entry = record.entry;
@@ -290,10 +453,10 @@ const HistoryDashboard = () => {
       return (
         <div
           key={record._id}
-          className="bg-white p-4 rounded-lg shadow-sm mb-4 cursor-pointer"
+          className="bg-white p-4 rounded-lg shadow-sm mb-4 cursor-pointer hover:shadow-md transition-shadow duration-200"
           onClick={() => setExpandedCardId(isExpanded ? null : record._id)}
         >
-          <div className="flex justify-between items-start mb-2">
+          <div className="flex flex-col sm:flex-row justify-between items-start mb-2 gap-2">
             <span
               className={`px-3 py-1 rounded-full text-xs font-semibold ${
                 isClientEntry
@@ -317,85 +480,111 @@ const HistoryDashboard = () => {
               {new Date(entry.date).toLocaleString()}
             </span>
           </div>
+
           <div className="space-y-2">
-            <p className="text-sm font-medium text-gray-900">
-              {entry.fullName || "System"}
-            </p>
-            <p className="text-sm text-gray-600">
-              {isClientEntry
-                ? (entry as ClientHistoryEntry).productName
-                : (entry as AdminHistoryEntry).entityName || "System Update"}
-            </p>
-            <p className="text-sm text-gray-600">
-              {isClientEntry
-                ? `$${(entry as ClientHistoryEntry).price.toFixed(2)}`
-                : (entry as AdminHistoryEntry).details || "System operation"}
-            </p>
-            {isClientEntry && (
-              <p className="text-xs text-gray-500">
-                Status:{" "}
-                <span
-                  className={`font-semibold ${
-                    (entry as ClientHistoryEntry).status === "completed"
-                      ? "text-green-600"
-                      : "text-yellow-600"
-                  }`}
-                >
-                  {(entry as ClientHistoryEntry).status || "Pending"}
-                </span>
+            <div className="flex items-center space-x-2">
+              <User className="w-4 h-4 text-gray-400" />
+              <p className="text-sm font-medium text-gray-900">
+                {entry.fullName || "System"}
               </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Package className="w-4 h-4 text-gray-400" />
+              <p className="text-sm text-gray-600">
+                {isClientEntry
+                  ? (entry as ClientHistoryEntry).productName
+                  : (entry as AdminHistoryEntry).entityName || "System Update"}
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <DollarSign className="w-4 h-4 text-gray-400" />
+              <p className="text-sm text-gray-600">
+                {isClientEntry
+                  ? `$${(entry as ClientHistoryEntry).price.toFixed(2)}`
+                  : (entry as AdminHistoryEntry).details || "System operation"}
+              </p>
+            </div>
+            {isClientEntry && (
+              <div className="flex items-center space-x-2">
+                <Tag className="w-4 h-4 text-gray-400" />
+                <p className="text-xs">
+                  Status:{" "}
+                  <span
+                    className={`font-semibold ${
+                      (entry as ClientHistoryEntry).status === "completed"
+                        ? "text-green-600"
+                        : "text-yellow-600"
+                    }`}
+                  >
+                    {(entry as ClientHistoryEntry).status || "Pending"}
+                  </span>
+                </p>
+              </div>
             )}
           </div>
 
           {/* Expanded Section */}
           {isExpanded && (
-            <div className="mt-4 space-y-2">
-              {isClientEntry && (
+            <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+              {isClientEntry ? (
                 <>
-                  <p className="text-sm text-gray-600">
-                    Email Sold:{" "}
-                    <span className="font-medium">
-                      {(entry as ClientHistoryEntry).emailSold}
-                    </span>
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Message:{" "}
-                    <span className="font-medium">
-                      {(entry as ClientHistoryEntry).message}
-                    </span>
-                  </p>
-                </>
-              )}
-              {!isClientEntry && (
-                <>
-                  {entry.action === "update" && (
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-gray-900">
-                        Updated Fields:
+                  {(entry as ClientHistoryEntry).emailSold && (
+                    <div className="flex items-center space-x-2">
+                      <Mail className="w-4 h-4 text-gray-400" />
+                      <p className="text-sm text-gray-600">
+                        Email Sold:{" "}
+                        <span className="font-medium">
+                          {(entry as ClientHistoryEntry).emailSold}
+                        </span>
                       </p>
-                      {renderUpdateFields(
-                        (entry as AdminHistoryEntry).updatedFields || {}
-                      )}
                     </div>
                   )}
+                  {(entry as ClientHistoryEntry).message && (
+                    <div className="flex items-start space-x-2">
+                      <Tag className="w-4 h-4 text-gray-400 mt-1" />
+                      <p className="text-sm text-gray-600">
+                        Message:{" "}
+                        <span className="font-medium">
+                          {(entry as ClientHistoryEntry).message}
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {entry.action === "update" &&
+                    renderUpdateFields(
+                      (entry as AdminHistoryEntry).updatedFields || {},
+                      (entry as AdminHistoryEntry).productDetails
+                    )}
                   {entry.action === "Recharge" && (
-                    <>
-                      <p className="text-sm text-gray-600">
-                        Previous Balance:{" "}
-                        <span className="font-medium">
-                          $
-                          {(
-                            entry as AdminHistoryEntry
-                          ).previousBalance?.toFixed(2)}
-                        </span>
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        New Balance:{" "}
-                        <span className="font-medium">
-                          ${(entry as AdminHistoryEntry).newBalance?.toFixed(2)}
-                        </span>
-                      </p>
-                    </>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <CreditCard className="w-4 h-4 text-gray-400" />
+                        <p className="text-sm text-gray-600">
+                          Previous Balance:{" "}
+                          <span className="font-medium">
+                            $
+                            {(
+                              entry as AdminHistoryEntry
+                            ).previousBalance?.toFixed(2)}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <CreditCard className="w-4 h-4 text-gray-400" />
+                        <p className="text-sm text-gray-600">
+                          New Balance:{" "}
+                          <span className="font-medium">
+                            $
+                            {(entry as AdminHistoryEntry).newBalance?.toFixed(
+                              2
+                            )}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </>
               )}
@@ -415,17 +604,17 @@ const HistoryDashboard = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
           History Dashboard
         </h1>
         <button
           onClick={() =>
             setSortDirection((prev) => (prev === "desc" ? "asc" : "desc"))
           }
-          className="inline-flex items-center px-4 py-2 bg-white border rounded-md hover:bg-gray-50 text-sm"
+          className="inline-flex items-center px-4 py-2 bg-white border rounded-md hover:bg-gray-50 text-sm transition-colors duration-200"
         >
           {sortDirection === "desc" ? (
             <SortDesc className="w-4 h-4 mr-2" />
@@ -437,8 +626,8 @@ const HistoryDashboard = () => {
       </div>
 
       {/* Filters Section */}
-      <div className="bg-white p-4 md:p-6 rounded-lg shadow-sm space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-white p-4 rounded-lg shadow-sm space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -452,7 +641,7 @@ const HistoryDashboard = () => {
           </div>
 
           {/* Date Range */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <input
               type="date"
               className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
@@ -460,7 +649,6 @@ const HistoryDashboard = () => {
               onChange={(e) =>
                 setDateRange((prev) => ({ ...prev, start: e.target.value }))
               }
-              placeholder="Start date"
             />
             <input
               type="date"
@@ -469,7 +657,6 @@ const HistoryDashboard = () => {
               onChange={(e) =>
                 setDateRange((prev) => ({ ...prev, end: e.target.value }))
               }
-              placeholder="End date"
             />
           </div>
 
@@ -479,11 +666,10 @@ const HistoryDashboard = () => {
             <select
               value={actionFilter}
               onChange={(e) => setActionFilter(e.target.value as ActionFilter)}
-              className="w-full pl-10 pr-4 py-2 border rounded-md appearance-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              className="w-full pl-10 pr-4 py-2 border rounded-md appearance-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
             >
               <option value="all">All Records</option>
               <option value="purchase">Purchases</option>
-              <option value="preorder">Pre-Orders</option>
               <option value="recharge-discount">Recharge/Discount</option>
               <option value="update">Updates</option>
             </select>
@@ -505,13 +691,12 @@ const HistoryDashboard = () => {
 
       {/* Pagination */}
       {filteredHistory.length > 0 && (
-        <div className="bg-white px-4 py-3 flex flex-col sm:flex-row items-center justify-between border-t border-gray-200">
-          {/* Mobile Pagination */}
-          <div className="flex justify-between w-full sm:hidden">
+        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 rounded-lg">
+          <div className="flex flex-1 justify-between sm:hidden">
             <button
               onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Previous
             </button>
@@ -523,13 +708,12 @@ const HistoryDashboard = () => {
                 setCurrentPage((prev) => Math.min(prev + 1, totalPages))
               }
               disabled={currentPage === totalPages}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next
             </button>
           </div>
 
-          {/* Desktop Pagination */}
           <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-gray-700">
@@ -563,8 +747,16 @@ const HistoryDashboard = () => {
                 <ChevronLeft className="h-4 w-4 -ml-2" />
               </button>
 
-              {/* Page Numbers */}
-              <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="relative inline-flex items-center px-2 py-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="sr-only">Previous</span>
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+
+              <div className="hidden md:flex items-center space-x-2">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum;
                   if (totalPages <= 5) {
@@ -603,6 +795,7 @@ const HistoryDashboard = () => {
                 <span className="sr-only">Next</span>
                 <ChevronRight className="h-4 w-4" />
               </button>
+
               <button
                 onClick={() => setCurrentPage(totalPages)}
                 disabled={currentPage === totalPages}
