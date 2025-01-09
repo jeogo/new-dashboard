@@ -25,6 +25,7 @@ interface ClientHistoryEntry {
   message?: string;
   responseMessage?: string;
   fulfillmentDate?: Date;
+  emailSold?: string; // Added emailSold field
 }
 
 interface AdminHistoryEntry {
@@ -66,7 +67,12 @@ interface History {
     | "Discount";
 }
 
-type ActionFilter = "all" | "client" | "admin";
+type ActionFilter =
+  | "all"
+  | "purchase"
+  | "preorder"
+  | "recharge-discount"
+  | "update";
 type SortDirection = "asc" | "desc";
 
 const ITEMS_PER_PAGE = 10;
@@ -85,18 +91,7 @@ const HistoryDashboard = () => {
     start: "",
     end: "",
   });
-  const [isMobileView, setIsMobileView] = useState(false);
-
-  // Effect for handling responsive design
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobileView(window.innerWidth < 768);
-    };
-
-    handleResize(); // Initial check
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
 
   // Effect for fetching data
   useEffect(() => {
@@ -144,6 +139,7 @@ const HistoryDashboard = () => {
                   fulfillmentDate: record.fulfillmentDate
                     ? new Date(record.fulfillmentDate)
                     : undefined,
+                  emailSold: record.emailSold, // Added emailSold field
                 }
               : {
                   action: record.action,
@@ -185,7 +181,32 @@ const HistoryDashboard = () => {
   const filterAndSortHistory = () => {
     let filtered = history.filter((record) => {
       if (actionFilter === "all") return true;
-      return record.type === actionFilter;
+      if (actionFilter === "purchase") {
+        return (
+          record.type === "client" &&
+          (record.entry as ClientHistoryEntry).action === "purchase"
+        );
+      }
+      if (actionFilter === "preorder") {
+        return (
+          record.type === "client" &&
+          (record.entry as ClientHistoryEntry).action === "preorder"
+        );
+      }
+      if (actionFilter === "recharge-discount") {
+        return (
+          record.type === "admin" &&
+          ((record.entry as AdminHistoryEntry).action === "Recharge" ||
+            (record.entry as AdminHistoryEntry).action === "Discount")
+        );
+      }
+      if (actionFilter === "update") {
+        return (
+          record.type === "admin" &&
+          (record.entry as AdminHistoryEntry).action === "update"
+        );
+      }
+      return false;
     });
 
     if (searchTerm) {
@@ -235,144 +256,154 @@ const HistoryDashboard = () => {
 
   const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
 
-  const renderClientEntry = (entry: ClientHistoryEntry) => (
-    <div className="md:hidden mb-4 p-4 bg-white rounded-lg shadow-sm">
-      <div className="flex justify-between items-start mb-2">
-        <span
-          className={`px-3 py-1 rounded-full text-xs font-semibold ${
-            entry.action === "purchase"
-              ? "bg-green-100 text-green-800"
-              : "bg-blue-100 text-blue-800"
-          }`}
-        >
-          {entry.action === "purchase" ? "Purchase" : "Preorder"}
-        </span>
-        <span
-          className={`px-3 py-1 rounded-full text-xs font-semibold ${
-            entry.status === "completed" || entry.action === "purchase"
-              ? "bg-green-100 text-green-800"
-              : entry.status === "canceled"
-              ? "bg-red-100 text-red-800"
-              : "bg-yellow-100 text-yellow-800"
-          }`}
-        >
-          {entry.status ||
-            (entry.action === "purchase" ? "Completed" : "Pending")}
-        </span>
-      </div>
-      <div className="space-y-2">
-        <p className="text-sm font-medium text-gray-900">{entry.fullName}</p>
-        <p className="text-sm text-gray-600">{entry.productName}</p>
-        <p className="text-sm font-medium text-gray-900">
-          ${entry.price.toFixed(2)}
-        </p>
-        <p className="text-xs text-gray-500">
-          {new Date(entry.date).toLocaleString()}
-        </p>
-      </div>
-    </div>
-  );
+  // Render readable update fields
+  const renderUpdateFields = (updatedFields: Record<string, any>) => {
+    return Object.entries(updatedFields).map(([field, value]) => {
+      if (typeof value === "object" && value !== null) {
+        return (
+          <div key={field} className="space-y-2">
+            <p className="text-sm font-medium text-gray-900">{field}:</p>
+            {Object.entries(value).map(([subField, subValue]) => (
+              <div key={subField} className="text-sm text-gray-600 pl-4">
+                <span className="font-medium">{subField}:</span>{" "}
+                {Array.isArray(subValue) ? subValue.join(", ") : String(subValue)}
+              </div>
+            ))}
+          </div>
+        );
+      }
+      return (
+        <div key={field} className="text-sm text-gray-600">
+          <span className="font-medium">{field}:</span> {value}
+        </div>
+      );
+    });
+  };
 
-  const renderAdminEntry = (entry: AdminHistoryEntry) => (
-    <div className="md:hidden mb-4 p-4 bg-white rounded-lg shadow-sm">
-      <div className="flex justify-between items-start mb-2">
-        <span
-          className={`px-3 py-1 rounded-full text-xs font-semibold ${
-            entry.action === "update"
-              ? "bg-yellow-100 text-yellow-800"
-              : entry.action === "Recharge"
-              ? "bg-green-100 text-green-800"
-              : "bg-blue-100 text-blue-800"
-          }`}
+  // Render cards for history entries
+  const renderHistoryCards = () => {
+    return paginatedHistory.map((record) => {
+      const entry = record.entry;
+      const isClientEntry = record.type === "client";
+      const isExpanded = expandedCardId === record._id;
+
+      return (
+        <div
+          key={record._id}
+          className="bg-white p-4 rounded-lg shadow-sm mb-4 cursor-pointer"
+          onClick={() => setExpandedCardId(isExpanded ? null : record._id)}
         >
-          {entry.action}
-        </span>
-      </div>
-      <div className="space-y-2">
-        <p className="text-sm font-medium text-gray-900">
-          {entry.fullName || "System"}
-        </p>
-        <p className="text-sm text-gray-600">
-          {entry.entityName || entry.entity || "System Update"}
-        </p>
-        <p className="text-xs text-gray-500">
-          {new Date(entry.date).toLocaleString()}
-        </p>
-        <p className="text-sm text-gray-600">
-          {entry.action === "Recharge" || entry.action === "Discount" ? (
-            <>
-              {entry.action === "Recharge" ? "Recharged" : "Discounted"} balance
-              by $
-              {Math.abs(
-                (entry.newBalance || 0) - (entry.previousBalance || 0)
-              ).toFixed(2)}
-            </>
-          ) : (
-            entry.details || `${entry.action} operation performed`
+          <div className="flex justify-between items-start mb-2">
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                isClientEntry
+                  ? entry.action === "purchase"
+                    ? "bg-green-100 text-green-800"
+                    : "bg-blue-100 text-blue-800"
+                  : entry.action === "update"
+                  ? "bg-yellow-100 text-yellow-800"
+                  : entry.action === "Recharge"
+                  ? "bg-green-100 text-green-800"
+                  : "bg-blue-100 text-blue-800"
+              }`}
+            >
+              {isClientEntry
+                ? entry.action === "purchase"
+                  ? "Purchase"
+                  : "Preorder"
+                : entry.action}
+            </span>
+            <span className="text-xs text-gray-500">
+              {new Date(entry.date).toLocaleString()}
+            </span>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-gray-900">
+              {entry.fullName || "System"}
+            </p>
+            <p className="text-sm text-gray-600">
+              {isClientEntry
+                ? (entry as ClientHistoryEntry).productName
+                : (entry as AdminHistoryEntry).entityName || "System Update"}
+            </p>
+            <p className="text-sm text-gray-600">
+              {isClientEntry
+                ? `$${(entry as ClientHistoryEntry).price.toFixed(2)}`
+                : (entry as AdminHistoryEntry).details || "System operation"}
+            </p>
+            {isClientEntry && (
+              <p className="text-xs text-gray-500">
+                Status:{" "}
+                <span
+                  className={`font-semibold ${
+                    (entry as ClientHistoryEntry).status === "completed"
+                      ? "text-green-600"
+                      : "text-yellow-600"
+                  }`}
+                >
+                  {(entry as ClientHistoryEntry).status || "Pending"}
+                </span>
+              </p>
+            )}
+          </div>
+
+          {/* Expanded Section */}
+          {isExpanded && (
+            <div className="mt-4 space-y-2">
+              {isClientEntry && (
+                <>
+                  <p className="text-sm text-gray-600">
+                    Email Sold:{" "}
+                    <span className="font-medium">
+                      {(entry as ClientHistoryEntry).emailSold}
+                    </span>
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Message:{" "}
+                    <span className="font-medium">
+                      {(entry as ClientHistoryEntry).message}
+                    </span>
+                  </p>
+                </>
+              )}
+              {!isClientEntry && (
+                <>
+                  {entry.action === "update" && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-900">
+                        Updated Fields:
+                      </p>
+                      {renderUpdateFields(
+                        (entry as AdminHistoryEntry).updatedFields || {}
+                      )}
+                    </div>
+                  )}
+                  {entry.action === "Recharge" && (
+                    <>
+                      <p className="text-sm text-gray-600">
+                        Previous Balance:{" "}
+                        <span className="font-medium">
+                          $
+                          {(
+                            entry as AdminHistoryEntry
+                          ).previousBalance?.toFixed(2)}
+                        </span>
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        New Balance:{" "}
+                        <span className="font-medium">
+                          ${(entry as AdminHistoryEntry).newBalance?.toFixed(2)}
+                        </span>
+                      </p>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
           )}
-        </p>
-      </div>
-    </div>
-  );
-
-  const renderTableRow = (record: History) => {
-    const isClientEntry = record.type === "client";
-    const entry = record.entry;
-
-    return [
-      <td key="action" className="p-4 text-sm">
-        <span
-          className={`px-3 py-1 rounded-full text-xs font-semibold ${
-            isClientEntry
-              ? entry.action === "purchase"
-                ? "bg-green-100 text-green-800"
-                : "bg-blue-100 text-blue-800"
-              : entry.action === "update"
-              ? "bg-yellow-100 text-yellow-800"
-              : entry.action === "Recharge"
-              ? "bg-green-100 text-green-800"
-              : "bg-blue-100 text-blue-800"
-          }`}
-        >
-          {isClientEntry
-            ? (entry as ClientHistoryEntry).action === "purchase"
-              ? "Purchase"
-              : "Preorder"
-            : (entry as AdminHistoryEntry).action}
-        </span>
-      </td>,
-      <td key="name" className="p-4 text-sm">
-        {entry.fullName || "System"}
-      </td>,
-      <td key="product-entity" className="p-4 text-sm">
-        {isClientEntry
-          ? (entry as ClientHistoryEntry).productName
-          : (entry as AdminHistoryEntry).entityName || "System Update"}
-      </td>,
-      <td key="amount-details" className="p-4 text-sm">
-        {isClientEntry
-          ? `$${(entry as ClientHistoryEntry).price.toFixed(2)}`
-          : (entry as AdminHistoryEntry).details || "System operation"}
-      </td>,
-      <td key="date" className="p-4 text-sm">
-        {new Date(entry.date).toLocaleString()}
-      </td>,
-      <td key="status" className="p-4 text-sm">
-        {isClientEntry ? (
-          <span
-            className={`px-3 py-1 rounded-full text-xs font-semibold ${
-              (entry as ClientHistoryEntry).status === "completed"
-                ? "bg-green-100 text-green-800"
-                : "bg-yellow-100 text-yellow-800"
-            }`}
-          >
-            {(entry as ClientHistoryEntry).status || "Pending"}
-          </span>
-        ) : (
-          (entry as AdminHistoryEntry).details || "System Update"
-        )}
-      </td>,
-    ];
+        </div>
+      );
+    });
   };
 
   if (isLoading) {
@@ -423,6 +454,7 @@ const HistoryDashboard = () => {
           {/* Date Range */}
           <div className="grid grid-cols-2 gap-2">
             <input
+              type="date"
               className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
               value={dateRange.start}
               onChange={(e) =>
@@ -450,8 +482,10 @@ const HistoryDashboard = () => {
               className="w-full pl-10 pr-4 py-2 border rounded-md appearance-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             >
               <option value="all">All Records</option>
-              <option value="client">Client Actions</option>
-              <option value="admin">Admin Actions</option>
+              <option value="purchase">Purchases</option>
+              <option value="preorder">Pre-Orders</option>
+              <option value="recharge-discount">Recharge/Discount</option>
+              <option value="update">Updates</option>
             </select>
           </div>
         </div>
@@ -464,182 +498,124 @@ const HistoryDashboard = () => {
         </div>
       )}
 
-      {/* History List */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        {/* Mobile View */}
-        <div className="md:hidden">
-          {paginatedHistory.map((record) => (
-            <div key={record._id}>
-              {record.type === "client"
-                ? renderClientEntry(record.entry as ClientHistoryEntry)
-                : renderAdminEntry(record.entry as AdminHistoryEntry)}
+      {/* History Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {renderHistoryCards()}
+      </div>
+
+      {/* Pagination */}
+      {filteredHistory.length > 0 && (
+        <div className="bg-white px-4 py-3 flex flex-col sm:flex-row items-center justify-between border-t border-gray-200">
+          {/* Mobile Pagination */}
+          <div className="flex justify-between w-full sm:hidden">
+            <button
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-gray-700">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
+              disabled={currentPage === totalPages}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+
+          {/* Desktop Pagination */}
+          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-gray-700">
+                Showing{" "}
+                <span className="font-medium">
+                  {Math.min(
+                    (currentPage - 1) * ITEMS_PER_PAGE + 1,
+                    filteredHistory.length
+                  )}
+                </span>{" "}
+                to{" "}
+                <span className="font-medium">
+                  {Math.min(
+                    currentPage * ITEMS_PER_PAGE,
+                    filteredHistory.length
+                  )}
+                </span>{" "}
+                of <span className="font-medium">{filteredHistory.length}</span>{" "}
+                results
+              </p>
             </div>
-          ))}
-        </div>
 
-        {/* Desktop View */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Action
-                </th>
-                <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Name
-                </th>
-                <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  {actionFilter === "admin" ? "Entity" : "Product"}
-                </th>
-                <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  {actionFilter === "admin" ? "Details" : "Amount"}
-                </th>
-                <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
-              {paginatedHistory.map((record) => (
-                <tr
-                  key={record._id}
-                  className="hidden md:table-row hover:bg-gray-50"
-                >
-                  {renderTableRow(record)}
-                </tr>
-              ))}
-              {paginatedHistory.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="p-8 text-center text-gray-500 text-sm"
-                  >
-                    No records found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {filteredHistory.length > 0 && (
-          <div className="bg-white px-4 py-3 flex flex-col sm:flex-row items-center justify-between border-t border-gray-200">
-            {/* Mobile Pagination */}
-            <div className="flex justify-between w-full sm:hidden">
+            <div className="flex items-center space-x-2">
               <button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="relative inline-flex items-center px-2 py-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Previous
+                <span className="sr-only">First</span>
+                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-4 w-4 -ml-2" />
               </button>
-              <span className="text-sm text-gray-700">
-                Page {currentPage} of {totalPages}
-              </span>
+
+              {/* Page Numbers */}
+              <div className="flex items-center space-x-2">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium rounded-md ${
+                        currentPage === pageNum
+                          ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
+                          : "border-gray-300 bg-white text-gray-500 hover:bg-gray-50"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+
               <button
                 onClick={() =>
                   setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                 }
                 disabled={currentPage === totalPages}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="relative inline-flex items-center px-2 py-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Next
+                <span className="sr-only">Next</span>
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="relative inline-flex items-center px-2 py-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="sr-only">Last</span>
+                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-4 w-4 -ml-2" />
               </button>
             </div>
-
-            {/* Desktop Pagination */}
-            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Showing{" "}
-                  <span className="font-medium">
-                    {Math.min(
-                      (currentPage - 1) * ITEMS_PER_PAGE + 1,
-                      filteredHistory.length
-                    )}
-                  </span>{" "}
-                  to{" "}
-                  <span className="font-medium">
-                    {Math.min(
-                      currentPage * ITEMS_PER_PAGE,
-                      filteredHistory.length
-                    )}
-                  </span>{" "}
-                  of{" "}
-                  <span className="font-medium">{filteredHistory.length}</span>{" "}
-                  results
-                </p>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  className="relative inline-flex items-center px-2 py-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="sr-only">First</span>
-                  <ChevronLeft className="h-4 w-4" />
-                  <ChevronLeft className="h-4 w-4 -ml-2" />
-                </button>
-
-                {/* Page Numbers */}
-                <div className="flex items-center space-x-2">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium rounded-md ${
-                          currentPage === pageNum
-                            ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
-                            : "border-gray-300 bg-white text-gray-500 hover:bg-gray-50"
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                  }
-                  disabled={currentPage === totalPages}
-                  className="relative inline-flex items-center px-2 py-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="sr-only">Next</span>
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage === totalPages}
-                  className="relative inline-flex items-center px-2 py-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="sr-only">Last</span>
-                  <ChevronRight className="h-4 w-4" />
-                  <ChevronRight className="h-4 w-4 -ml-2" />
-                </button>
-              </div>
-            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

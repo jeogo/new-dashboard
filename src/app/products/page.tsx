@@ -12,7 +12,12 @@ import {
   FaCheck,
   FaHistory,
 } from "react-icons/fa";
-
+interface EmailChanges {
+  old?: string[]; // Old list of emails
+  new?: string[]; // New list of emails
+  added?: string[]; // Emails that were added
+  removed?: string[]; // Emails that were removed
+}
 interface Product {
   _id: string;
   name: string;
@@ -105,18 +110,21 @@ const HistoryModal = ({
     }>
   >([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [visibleEntries, setVisibleEntries] = useState(10); // Show only 10 entries initially
 
+  // Fetch sales data (only once when the modal opens)
   useEffect(() => {
     fetchSalesData();
   }, []);
 
+  // Fetch sales data and map it to users
   const fetchSalesData = async () => {
     if (!product.archive?.length) return;
 
     setIsLoading(true);
     try {
       const salesWithUsers = await Promise.all(
-        product.archive.map(async (sale: ArchiveEntry) => {
+        product.archive.slice(-10).map(async (sale: ArchiveEntry) => {
           try {
             const user = await apiClient.get(`/users/${sale.soldTo}`);
             return { sale, user };
@@ -133,6 +141,7 @@ const HistoryModal = ({
     }
   };
 
+  // Combine history and sales entries
   const getAllHistoryEntries = () => {
     const historyEntries = [...(product.history || [])];
 
@@ -171,13 +180,8 @@ const HistoryModal = ({
         return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
       });
   };
-  interface EmailChanges {
-    old?: string[];
-    new?: string[];
-    added?: string[];
-    removed?: string[];
-  }
 
+  // Format changes for display
   const formatChanges = (entry: any) => {
     if (entry.action === "sale") {
       return (
@@ -188,59 +192,60 @@ const HistoryModal = ({
         </div>
       );
     }
-    const handleEmailChanges = (value: EmailChanges = {}) => {
-      const {
-          old = [], 
-          new: newEmails = [], 
-          added = [], 
-          removed = []
-      } = value;
 
-      return (
-          <div className="space-y-2">
-              {removed.length > 0 && (
-                  <div className="text-red-600">
-                      Removed: {removed.join(", ")}
-                  </div>
-              )}
-              {added.length > 0 && (
-                  <div className="text-green-600">
-                      Added: {added.join(", ")}
-                  </div>
-              )}
-              {old.length > 0 && newEmails.length > 0 && (
-                  <div>
-                      Changed from: {old.join(", ")} to {newEmails.join(", ")}
-                  </div>
-              )}
-          </div>
-      );
-  };
     if (!entry.updatedFields) return null;
 
     return (
       <div className="space-y-2">
-   {Object.entries(entry.updatedFields).map(([field, value]) => {
-                if (field === "emails") {
-                    return (
-                        <div key={field}>
-                            <span className="font-medium">Email Updates:</span>
-                            {handleEmailChanges(value as EmailChanges)}
-                        </div>
-                    );
-                }})}
+        {Object.entries(entry.updatedFields).map(([field, value]) => {
+          if (field === "emails") {
+            return (
+              <div key={field}>
+                <span className="font-medium">Email Updates:</span>
+                {handleEmailChanges(value as EmailChanges)}
+              </div>
+            );
+          }
+          return (
+            <div key={field}>
+              <span className="font-medium">{field}:</span> {String(value)}
+            </div>
+          );
+        })}
       </div>
     );
   };
 
+  // Handle email changes
+  const handleEmailChanges = (value: EmailChanges = {}) => {
+    const { old = [], new: newEmails = [], added = [], removed = [] } = value;
+
+    return (
+      <div className="space-y-2">
+        {removed.length > 0 && (
+          <div className="text-red-600">Removed: {removed.join(", ")}</div>
+        )}
+        {added.length > 0 && (
+          <div className="text-green-600">Added: {added.join(", ")}</div>
+        )}
+        {old.length > 0 && newEmails.length > 0 && (
+          <div>
+            Changed from: {old.join(", ")} to {newEmails.join(", ")}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Get filtered and sorted history entries
   const historyEntries = getAllHistoryEntries();
 
   return (
     <Modal title={`History - ${product.name}`} onClose={onClose}>
       <div className="space-y-6">
         {/* Filters */}
-        <div className="flex flex-col md:flex-row gap-4 bg-gray-50 p-4 rounded-lg">
-          <div className="flex-1">
+        <div className="flex flex-col gap-4 bg-gray-50 p-4 rounded-lg">
+          <div>
             <label className="block text-sm font-medium mb-1">
               Action Type
             </label>
@@ -255,25 +260,29 @@ const HistoryModal = ({
               <option value="sale">Sale</option>
             </select>
           </div>
-          <div className="flex-1">
-            <label className="block text-sm font-medium mb-1">Start Date</label>
-            <input
-              type="date"
-              className="w-full p-2 border rounded"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Start Date
+              </label>
+              <input
+                type="date"
+                className="w-full p-2 border rounded"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">End Date</label>
+              <input
+                type="date"
+                className="w-full p-2 border rounded"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="flex-1">
-            <label className="block text-sm font-medium mb-1">End Date</label>
-            <input
-              type="date"
-              className="w-full p-2 border rounded"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
-          </div>
-          <div className="flex-1">
+          <div>
             <label className="block text-sm font-medium mb-1">Sort Order</label>
             <select
               className="w-full p-2 border rounded"
@@ -286,8 +295,8 @@ const HistoryModal = ({
           </div>
         </div>
 
-        {/* History Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        {/* History Entries (Card-Based Design) */}
+        <div className="space-y-4">
           {isLoading ? (
             <div className="p-8 text-center">Loading history...</div>
           ) : historyEntries.length === 0 ? (
@@ -295,57 +304,56 @@ const HistoryModal = ({
               No history entries found.
             </div>
           ) : (
-            <div className="max-h-[calc(100vh-400px)] overflow-y-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50 sticky top-0">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Date & Time
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Action
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Changes
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      User
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {historyEntries.map((entry, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm text-gray-500">
+            <>
+              {historyEntries.slice(0, visibleEntries).map((entry, index) => (
+                <div
+                  key={index}
+                  className="bg-white p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="text-sm text-gray-500">
                         {new Date(entry.date).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                      </div>
+                      <div className="mt-1">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            entry.action === "sale"
+                              ? "bg-purple-100 text-purple-800"
+                              : entry.action === "create"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-blue-100 text-blue-800"
+                          }`}
+                        >
                           {entry.action.toUpperCase()}
                         </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm">{formatChanges(entry)}</div>
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        {entry.userDetails ? (
-                          <div>
-                            <div className="font-medium text-gray-900">
-                              {entry.userDetails.fullName}
-                            </div>
-                            <div className="text-gray-500">
-                              {entry.userDetails.phone}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-gray-500">-</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </div>
+                    {entry.userDetails && (
+                      <div className="text-right">
+                        <div className="font-medium text-gray-900">
+                          {entry.userDetails.fullName}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {entry.userDetails.phone}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-4 text-sm text-gray-700">
+                    {formatChanges(entry)}
+                  </div>
+                </div>
+              ))}
+              {historyEntries.length > visibleEntries && (
+                <button
+                  onClick={() => setVisibleEntries((prev) => prev + 10)}
+                  className="w-full py-2 text-center text-blue-500 hover:bg-blue-50 rounded-lg"
+                >
+                  Load More
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -628,7 +636,7 @@ export default function ProductsPage() {
 
   const confirmAddEmails = async () => {
     if (!selectedProduct || emailsToAdd.length === 0) return;
-  
+
     try {
       for (let i = 0; i < emailsToAdd.length; i += MAX_EMAILS_PER_REQUEST) {
         const chunk = emailsToAdd.slice(i, i + MAX_EMAILS_PER_REQUEST);
@@ -636,12 +644,12 @@ export default function ProductsPage() {
           emails: chunk,
         });
       }
-  
+
       // Update local state
       setSelectedProduct((prev) =>
         prev ? { ...prev, emails: [...prev.emails, ...emailsToAdd] } : null
       );
-  
+
       setNewEmail("");
       setEmailsToAdd([]);
       setShowEmailConfirmModal(false);
@@ -836,39 +844,83 @@ export default function ProductsPage() {
         <FaPlusCircle className="mr-2" /> Add New Product
       </button>
 
-      {isLoading ? (
-        <div className="flex justify-center p-8">
-          <FaSpinner className="animate-spin text-gray-500" size={36} />
-        </div>
-      ) : products.length === 0 ? (
-        <div className="text-center p-8 text-gray-500">
-          No products found. Click "Add New Product" to create one.
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white border border-gray-200">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="text-left p-4 border-b">Name</th>
-                <th className="text-left p-4 border-b">Price</th>
-                <th className="text-left p-4 border-b">Category</th>
-                <th className="text-left p-4 border-b">Available</th>
-                <th className="text-left p-4 border-b">Pre-Order</th>
-                <th className="text-left p-4 border-b">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((product) => (
-                <tr key={product._id} className="hover:bg-gray-50">
-                  <td className="p-4 border-b">{product.name}</td>
-                  <td className="p-4 border-b">${product.price.toFixed(2)}</td>
-                  <td className="p-4 border-b">
-                    {categories.find((cat) => cat._id === product.categoryId)
-                      ?.name || "Uncategorized"}
-                  </td>
-                  <td className="p-4 border-b">
+      <div className="space-y-4">
+        {isLoading ? (
+          <div className="flex justify-center p-8">
+            <FaSpinner className="animate-spin text-gray-500" size={36} />
+          </div>
+        ) : products.length === 0 ? (
+          <div className="text-center p-8 text-gray-500">
+            No products found. Click "Add New Product" to create one.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {products.map((product) => (
+              <div
+                key={product._id}
+                className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow"
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-800">
+                      {product.name}
+                    </h2>
+                    <p className="text-lg text-green-600 font-semibold">
+                      ${product.price.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => {
+                        setSelectedProduct(product);
+                        setShowHistoryModal(true);
+                      }}
+                      className="text-blue-500 hover:text-blue-700"
+                      title="View History"
+                    >
+                      <FaHistory />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedProduct(product);
+                        setNewProductData({
+                          name: product.name,
+                          description: product.description,
+                          price: product.price.toString(),
+                          emailsText: product.emails.join(", "),
+                          categoryId: product.categoryId,
+                          isAvailable: product.isAvailable,
+                          allowPreOrder: product.allowPreOrder,
+                        });
+                        setShowEditModal(true);
+                      }}
+                      className="text-yellow-500 hover:text-yellow-700"
+                    >
+                      <FaEdit />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedProduct(product);
+                        setShowDeleteModal(true);
+                      }}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      <FaTrash />
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-500">Category:</span>
+                    <span className="text-sm font-medium text-gray-800">
+                      {categories.find((cat) => cat._id === product.categoryId)
+                        ?.name || "Uncategorized"}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-500">Available:</span>
                     <span
-                      className={`px-2 py-1 rounded ${
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
                         product.isAvailable
                           ? "bg-green-100 text-green-800"
                           : "bg-red-100 text-red-800"
@@ -876,10 +928,11 @@ export default function ProductsPage() {
                     >
                       {product.isAvailable ? "Yes" : "No"}
                     </span>
-                  </td>
-                  <td className="p-4 border-b">
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-500">Pre-Order:</span>
                     <span
-                      className={`px-2 py-1 rounded ${
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
                         product.allowPreOrder
                           ? "bg-blue-100 text-blue-800"
                           : "bg-gray-100 text-gray-800"
@@ -887,54 +940,13 @@ export default function ProductsPage() {
                     >
                       {product.allowPreOrder ? "Yes" : "No"}
                     </span>
-                  </td>
-                  <td className="p-4 border-b">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => {
-                          setSelectedProduct(product);
-                          setShowHistoryModal(true);
-                        }}
-                        className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition"
-                        title="View History"
-                      >
-                        <FaHistory />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedProduct(product);
-                          setNewProductData({
-                            name: product.name,
-                            description: product.description,
-                            price: product.price.toString(),
-                            emailsText: product.emails.join(", "),
-                            categoryId: product.categoryId,
-                            isAvailable: product.isAvailable,
-                            allowPreOrder: product.allowPreOrder,
-                          });
-                          setShowEditModal(true);
-                        }}
-                        className="bg-yellow-500 text-white p-2 rounded hover:bg-yellow-600 transition"
-                      >
-                        <FaEdit />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedProduct(product);
-                          setShowDeleteModal(true);
-                        }}
-                        className="bg-red-500 text-white p-2 rounded hover:bg-red-600 transition"
-                      >
-                        <FaTrash />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {showCreateModal && (
         <Modal
@@ -1053,248 +1065,182 @@ export default function ProductsPage() {
 
       {showEditModal && selectedProduct && (
         <Modal
-          title="Product Details"
+          title="Edit Product"
           onClose={() => {
             setShowEditModal(false);
             setIsEditMode(false);
           }}
           onConfirm={handleSaveEdit}
+          confirmText="Save Changes"
         >
-          <div className="flex flex-col md:flex-row">
-            {!isEditMode ? (
-              <div className="w-full p-6 bg-gray-50">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800">
-                    Product Details
-                  </h2>
-                  <button
-                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
-                    onClick={() => setIsEditMode(true)}
-                  >
-                    Edit Product
-                  </button>
+          <div className="space-y-6">
+            {/* Product Details */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="text-lg font-semibold mb-4">Product Details</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    value={newProductData.name}
+                    onChange={(e) =>
+                      setNewProductData({
+                        ...newProductData,
+                        name: e.target.value,
+                      })
+                    }
+                  />
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-gray-600 font-medium mb-2">
-                      Product Name
-                    </label>
-                    <p className="text-lg font-bold text-gray-900">
-                      {selectedProduct.name}
-                    </p>
+                {/* Price */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Price
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    value={newProductData.price}
+                    onChange={(e) =>
+                      setNewProductData({
+                        ...newProductData,
+                        price: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                {/* Category */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Category
+                  </label>
+                  <select
+                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    value={newProductData.categoryId}
+                    onChange={(e) =>
+                      setNewProductData({
+                        ...newProductData,
+                        categoryId: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">Select a Category</option>
+                    {categories.map((category) => (
+                      <option key={category._id} value={category._id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Availability */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Available
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      className="form-checkbox h-5 w-5 text-blue-500"
+                      checked={newProductData.isAvailable}
+                      onChange={(e) =>
+                        setNewProductData({
+                          ...newProductData,
+                          isAvailable: e.target.checked,
+                        })
+                      }
+                    />
+                    <span className="text-sm text-gray-700">
+                      {newProductData.isAvailable ? "Yes" : "No"}
+                    </span>
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-gray-600 font-medium mb-2">
-                      Price
-                    </label>
-                    <p className="text-lg font-bold text-green-600">
-                      ${selectedProduct.price.toFixed(2)}
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-600 font-medium mb-2">
-                      Category
-                    </label>
-                    <p className="text-lg text-gray-800">
-                      {categories.find(
-                        (c) => c._id === selectedProduct.categoryId
-                      )?.name || "N/A"}
-                    </p>
-                  </div>
-
-                  <div className="flex space-x-4">
-                    <div>
-                      <label className="block text-gray-600 font-medium mb-2">
-                        Available
-                      </label>
-                      <span
-                        className={`px-3 py-1 rounded ${
-                          selectedProduct.isAvailable
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {selectedProduct.isAvailable ? "Yes" : "No"}
-                      </span>
-                    </div>
-
-                    <div>
-                      <label className="block text-gray-600 font-medium mb-2">
-                        Pre-Order
-                      </label>
-                      <span
-                        className={`px-3 py-1 rounded ${
-                          selectedProduct.allowPreOrder
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {selectedProduct.allowPreOrder ? "Yes" : "No"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="col-span-2 mt-6">
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="text-gray-600 font-medium">
-                        Emails ({selectedProduct.emails.length})
-                      </label>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow max-h-60 overflow-y-auto">
-                      {selectedProduct.emails.map((email, index) => (
-                        <div
-                          key={index}
-                          className="flex justify-between items-center py-2 px-3 hover:bg-gray-50 rounded"
-                        >
-                          <span className="text-gray-800">{email}</span>
-                          <button
-                            onClick={() => {
-                              setEmailToDelete(email);
-                              setShowDeleteEmailModal(true);
-                            }}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <FaTimes />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                {/* Pre-Order */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Pre-Order
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      className="form-checkbox h-5 w-5 text-blue-500"
+                      checked={newProductData.allowPreOrder}
+                      onChange={(e) =>
+                        setNewProductData({
+                          ...newProductData,
+                          allowPreOrder: e.target.checked,
+                        })
+                      }
+                    />
+                    <span className="text-sm text-gray-700">
+                      {newProductData.allowPreOrder ? "Yes" : "No"}
+                    </span>
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="w-full p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800">
-                    Edit Product
-                  </h2>
-                  <button
-                    className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition"
-                    onClick={() => setIsEditMode(false)}
-                  >
-                    View Details
-                  </button>
-                </div>
+            </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block mb-2 font-medium">
-                      Product Name *
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      value={newProductData.name}
-                      onChange={(e) =>
-                        setNewProductData({
-                          ...newProductData,
-                          name: e.target.value,
-                        })
-                      }
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block mb-2 font-medium">Price *</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      value={newProductData.price}
-                      onChange={(e) =>
-                        setNewProductData({
-                          ...newProductData,
-                          price: e.target.value,
-                        })
-                      }
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block mb-2 font-medium">Category *</label>
-                    <select
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      value={newProductData.categoryId}
-                      onChange={(e) =>
-                        setNewProductData({
-                          ...newProductData,
-                          categoryId: e.target.value,
-                        })
-                      }
-                      required
-                    >
-                      <option value="">Select a Category</option>
-                      {categories.map((category) => (
-                        <option key={category._id} value={category._id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <form onSubmit={handleAddEmail} className="space-y-4">
-                    <div>
-                      <label className="block mb-2 font-medium">
-                        Add New Emails (Current Count:{" "}
-                        {selectedProduct?.emails.length || 0})
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          placeholder="Enter emails (comma-separated)"
-                          value={newEmail}
-                          onChange={(e) => setNewEmail(e.target.value)}
-                        />
+            {/* Emails Section */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="text-lg font-semibold mb-4">Emails</h3>
+              <div className="space-y-4">
+                {/* Current Emails */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Current Emails ({selectedProduct.emails.length})
+                  </label>
+                  <div className="bg-white p-2 rounded-lg shadow-inner max-h-40 overflow-y-auto">
+                    {selectedProduct.emails.map((email, index) => (
+                      <div
+                        key={index}
+                        className="flex justify-between items-center py-2 px-3 hover:bg-gray-50 rounded"
+                      >
+                        <span className="text-sm text-gray-800">{email}</span>
                         <button
-                          type="submit"
-                          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
+                          onClick={() => {
+                            setEmailToDelete(email);
+                            setShowDeleteEmailModal(true);
+                          }}
+                          className="text-red-500 hover:text-red-700"
                         >
-                          Add
+                          <FaTimes />
                         </button>
                       </div>
-                    </div>
-                  </form>
-                  <div className="flex space-x-4">
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        className="mr-2"
-                        checked={newProductData.isAvailable}
-                        onChange={(e) =>
-                          setNewProductData({
-                            ...newProductData,
-                            isAvailable: e.target.checked,
-                          })
-                        }
-                      />
-                      Available
-                    </label>
-
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        className="mr-2"
-                        checked={newProductData.allowPreOrder}
-                        onChange={(e) =>
-                          setNewProductData({
-                            ...newProductData,
-                            allowPreOrder: e.target.checked,
-                          })
-                        }
-                      />
-                      Allow Pre-Order
-                    </label>
+                    ))}
                   </div>
                 </div>
+
+                {/* Add New Emails */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
+                    Add New Emails
+                  </label>
+                  <form onSubmit={handleAddEmail} className="flex gap-2">
+                    <input
+                      type="text"
+                      className="flex-1 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter emails (comma-separated)"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                    />
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                    >
+                      Add
+                    </button>
+                  </form>
+                </div>
               </div>
-            )}
+            </div>
           </div>
         </Modal>
       )}

@@ -13,6 +13,7 @@ import {
   FaSort,
 } from "react-icons/fa";
 
+// Define types
 interface UserEvent {
   type: "recharge" | "status" | "delete" | "purchase";
   date: Date;
@@ -133,10 +134,13 @@ export default function UsersPage() {
   >("all");
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
+
+  // Fetch users on component mount
   useEffect(() => {
     fetchUsers();
   }, []);
 
+  // Apply filters and sorting whenever users, searchTerm, sortConfig, or filterStatus changes
   useEffect(() => {
     let result = [...users];
 
@@ -148,20 +152,20 @@ export default function UsersPage() {
     }
 
     // Apply search filter
- // Apply search filter
-if (searchTerm) {
-  const searchLower = searchTerm.toLowerCase();
-  result = result.filter((user) => {
-    return (
-      (user.fullName && user.fullName.toLowerCase().includes(searchLower)) ||
-      (user.name.toLowerCase().includes(searchLower)) ||
-      (user.username.toLowerCase().includes(searchLower)) ||
-      (user.telegramId && user.telegramId.includes(searchTerm)) || // Check if telegramId is defined
-      (user.phoneNumber && user.phoneNumber.includes(searchTerm)) || // Check if phoneNumber is defined
-      (user.chatId && user.chatId.includes(searchTerm)) // Check if chatId is defined
-    );
-  });
-}
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      result = result.filter((user) => {
+        return (
+          (user.fullName &&
+            user.fullName.toLowerCase().includes(searchLower)) ||
+          user.name.toLowerCase().includes(searchLower) ||
+          user.username.toLowerCase().includes(searchLower) ||
+          (user.telegramId && user.telegramId.includes(searchTerm)) ||
+          (user.phoneNumber && user.phoneNumber.includes(searchTerm)) ||
+          (user.chatId && user.chatId.includes(searchTerm))
+        );
+      });
+    }
 
     // Apply sorting
     result.sort((a: any, b: any) => {
@@ -176,10 +180,11 @@ if (searchTerm) {
     setFilteredUsers(result);
   }, [users, searchTerm, sortConfig, filterStatus]);
 
+  // Fetch users from the API
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
-      const response = await apiClient.get("/users");
+      const response = await apiClient.get<User[]>("/users");
       setUsers(response);
       setFilteredUsers(response);
     } catch (error) {
@@ -188,6 +193,8 @@ if (searchTerm) {
       setIsLoading(false);
     }
   };
+
+  // Handle adding or deducting balance
   const handleAddBalance = async (amount: number) => {
     if (selectedUser && amount) {
       setIsUpdating(true);
@@ -207,6 +214,7 @@ if (searchTerm) {
     }
   };
 
+  // Handle deleting a user
   const handleDeleteUser = async () => {
     if (userToDelete) {
       try {
@@ -220,6 +228,7 @@ if (searchTerm) {
     }
   };
 
+  // Handle accepting or rejecting a user
   const handleUserAction = async (userId: string, isAccepted: boolean) => {
     setIsUpdating(true);
     try {
@@ -235,6 +244,7 @@ if (searchTerm) {
     }
   };
 
+  // Handle sorting
   const handleSort = (key: keyof User) => {
     setSortConfig((current) => ({
       key,
@@ -250,25 +260,31 @@ if (searchTerm) {
       <div className="bg-white shadow-md rounded-lg overflow-hidden">
         {/* Header */}
         <div className="p-4 bg-gray-100 space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            {/* Title */}
             <h1 className="text-3xl font-bold text-gray-800">
               User Management
             </h1>
-            <div className="flex space-x-4">
-              <div className="relative">
+
+            {/* Search and Filter */}
+            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+              {/* Search Input */}
+              <div className="relative w-full sm:w-64">
                 <input
                   type="text"
                   placeholder="Search users..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border rounded-lg w-64"
+                  className="pl-10 pr-4 py-2 border rounded-lg w-full"
                 />
                 <FaSearch className="absolute left-3 top-3 text-gray-400" />
               </div>
+
+              {/* Status Filter Dropdown */}
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value as any)}
-                className="border rounded-lg px-4 py-2"
+                className="border rounded-lg px-4 py-2 w-full sm:w-auto"
               >
                 <option value="all">All Users</option>
                 <option value="accepted">Accepted</option>
@@ -277,154 +293,115 @@ if (searchTerm) {
             </div>
           </div>
         </div>
-
         {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-100">
-              <tr>
-                <th
-                  className="p-4 text-left cursor-pointer"
-                  onClick={() => handleSort("telegramId")}
-                >
-                  Telegram ID <FaSort className="inline ml-1" />
-                </th>
-                <th
-                  className="p-4 text-left cursor-pointer"
-                  onClick={() => handleSort("chatId")}
-                >
-                  Chat ID <FaSort className="inline ml-1" />
-                </th>
-                <th
-                  className="p-4 text-left cursor-pointer"
-                  onClick={() => handleSort("username")}
-                >
-                  Username <FaSort className="inline ml-1" />
-                </th>
-                <th
-                  className="p-4 text-left cursor-pointer"
-                  onClick={() => handleSort("name")}
-                >
-                  Name <FaSort className="inline ml-1" />
-                </th>
-                <th className="p-4 text-left">Full Name</th>
-                <th className="p-4 text-left">Phone Number</th>
-                <th
-                  className="p-4 text-left cursor-pointer"
-                  onClick={() => handleSort("balance")}
-                >
-                  Balance <FaSort className="inline ml-1" />
-                </th>
-                <th
-                  className="p-4 text-left cursor-pointer"
-                  onClick={() => handleSort("registerDate")}
-                >
-                  Register Date <FaSort className="inline ml-1" />
-                </th>
-                <th
-                  className="p-4 text-left cursor-pointer"
-                  onClick={() => handleSort("isAccepted")}
-                >
-                  Status <FaSort className="inline ml-1" />
-                </th>
-                <th className="p-4 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={10} className="text-center p-4">
-                    <FaSpinner className="animate-spin mx-auto" />
-                  </td>
-                </tr>
-              ) : filteredUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="text-center p-4">
-                    No users found
-                  </td>
-                </tr>
-              ) : (
-                filteredUsers.map((user) => (
-                  <tr key={user._id} className="border-b hover:bg-gray-50">
-                    <td className="p-4">{user.telegramId}</td>
-                    <td className="p-4">{user.chatId}</td>
-                    <td className="p-4">{user.username}</td>
-                    <td className="p-4">{user.name}</td>
-                    <td className="p-4">{user.fullName || "N/A"}</td>
-                    <td className="p-4">{user.phoneNumber || "N/A"}</td>
-                    <td className="p-4 text-green-600 font-semibold">
+        <div className="space-y-4">
+          {isLoading ? (
+            <div className="flex justify-center items-center p-8">
+              <FaSpinner className="animate-spin text-2xl text-blue-500" />
+            </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="text-center p-8 text-gray-500">No users found</div>
+          ) : (
+            filteredUsers.map((user) => (
+              <div
+                key={user._id}
+                className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 items-center">
+                  {/* Telegram ID */}
+                  <div>
+                    <p className="text-sm text-gray-500">Telegram ID</p>
+                    <p className="font-medium">{user.telegramId}</p>
+                  </div>
+
+                  {/* Name */}
+                  <div>
+                    <p className="text-sm text-gray-500">Name</p>
+                    <p className="font-medium">{user.name}</p>
+                  </div>
+
+                  {/* Full Name */}
+                  <div>
+                    <p className="text-sm text-gray-500">Full Name</p>
+                    <p className="font-medium">{user.fullName || "N/A"}</p>
+                  </div>
+
+                  {/* Balance */}
+                  <div>
+                    <p className="text-sm text-gray-500">Balance</p>
+                    <p className="font-medium text-green-600">
                       {user.balance} Units
-                    </td>
-                    <td className="p-4">
-                      {new Date(user.registerDate).toLocaleDateString()}
-                    </td>
-                    <td className="p-4">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs ${
-                          user.isAccepted
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
+                    </p>
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <p className="text-sm text-gray-500">Status</p>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        user.isAccepted
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {user.isAccepted ? "Accepted" : "Pending"}
+                    </span>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex space-x-4 justify-end">
+                    {user.isAccepted ? (
+                      <button
+                        onClick={() => handleUserAction(user._id, false)}
+                        className="p-2 rounded-full text-yellow-500 hover:bg-yellow-100 transition-colors"
+                        title="Reject User"
                       >
-                        {user.isAccepted ? "Accepted" : "Pending"}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex space-x-2">
-                        {user.isAccepted ? (
-                          <button
-                            onClick={() => handleUserAction(user._id, false)}
-                            className="text-yellow-500 hover:text-yellow-700"
-                            title="Reject User"
-                          >
-                            <FaUserTimes />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleUserAction(user._id, true)}
-                            className="text-green-500 hover:text-green-700"
-                            title="Accept User"
-                          >
-                            <FaUserCheck />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => {
-                            setSelectedUser(user);
-                            setShowHistoryModal(true);
-                          }}
-                          className="text-gray-500 hover:text-gray-700"
-                          title="View History"
-                        >
-                          <FaHistory />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedUser(user);
-                            setShowAddBalanceModal(true);
-                          }}
-                          className="text-blue-500 hover:text-blue-700"
-                          title="Add Balance"
-                        >
-                          <FaPlusCircle />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setUserToDelete(user);
-                            setShowDeleteModal(true);
-                          }}
-                          className="text-red-500 hover:text-red-700"
-                          title="Delete User"
-                        >
-                          <FaTrash />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                        <FaUserTimes className="text-xl" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleUserAction(user._id, true)}
+                        className="p-2 rounded-full text-green-500 hover:bg-green-100 transition-colors"
+                        title="Accept User"
+                      >
+                        <FaUserCheck className="text-xl" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setSelectedUser(user);
+                        setShowHistoryModal(true);
+                      }}
+                      className="p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
+                      title="View History"
+                    >
+                      <FaHistory className="text-xl" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedUser(user);
+                        setShowAddBalanceModal(true);
+                      }}
+                      className="p-2 rounded-full text-blue-500 hover:bg-blue-100 transition-colors"
+                      title="Add Balance"
+                    >
+                      <FaPlusCircle className="text-xl" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setUserToDelete(user);
+                        setShowDeleteModal(true);
+                      }}
+                      className="p-2 rounded-full text-red-500 hover:bg-red-100 transition-colors"
+                      title="Delete User"
+                    >
+                      <FaTrash className="text-xl" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -456,12 +433,10 @@ if (searchTerm) {
               </label>
               <input
                 type="number"
-                value={balanceInput.replace("-", "")} // Remove any negative sign
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Store positive value but handle sign based on type
-                  setBalanceInput(value.replace("-", "")); // Always store positive
-                }}
+                value={balanceInput.replace("-", "")}
+                onChange={(e) =>
+                  setBalanceInput(e.target.value.replace("-", ""))
+                }
                 className="w-full p-2 border rounded"
                 min="0"
                 placeholder="Enter positive value"
@@ -489,7 +464,6 @@ if (searchTerm) {
               </button>
               <button
                 onClick={() => {
-                  // Convert to negative if it's a discount
                   const finalAmount =
                     balanceType === "Discount"
                       ? -parseInt(balanceInput)
@@ -525,132 +499,94 @@ if (searchTerm) {
           }`}
           onClose={() => setShowHistoryModal(false)}
         >
-          <div className="space-y-4">
-            {/* User Details Card */}
+          <div className="space-y-6">
+            {/* User Details Section */}
             <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="text-lg font-semibold mb-2">User Details</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <p>
-                  <span className="font-medium">Username:</span>{" "}
-                  {selectedUser.username}
-                </p>
-                <p>
-                  <span className="font-medium">Name:</span> {selectedUser.name}
-                </p>
-                <p>
-                  <span className="font-medium">Current Balance:</span>{" "}
-                  {selectedUser.balance} Units
-                </p>
-                <p>
-                  <span className="font-medium">Register Date:</span>{" "}
-                  {new Date(selectedUser.registerDate).toLocaleDateString()}
-                </p>
+              <h3 className="text-lg font-semibold mb-4">User Details</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {/* Username */}
+                <div>
+                  <p className="text-sm text-gray-500">Username</p>
+                  <p className="font-medium">{selectedUser.username}</p>
+                </div>
+
+                {/* Name */}
+                <div>
+                  <p className="text-sm text-gray-500">Name</p>
+                  <p className="font-medium">{selectedUser.name}</p>
+                </div>
+
+                {/* Full Name */}
+                <div>
+                  <p className="text-sm text-gray-500">Full Name</p>
+                  <p className="font-medium">
+                    {selectedUser.fullName || "N/A"}
+                  </p>
+                </div>
+
+                {/* Phone Number */}
+                <div>
+                  <p className="text-sm text-gray-500">Phone Number</p>
+                  <p className="font-medium">
+                    {selectedUser.phoneNumber || "N/A"}
+                  </p>
+                </div>
+
+                {/* Telegram ID */}
+                <div>
+                  <p className="text-sm text-gray-500">Telegram ID</p>
+                  <p className="font-medium">{selectedUser.telegramId}</p>
+                </div>
+
+                {/* Register Date */}
+                <div>
+                  <p className="text-sm text-gray-500">Register Date</p>
+                  <p className="font-medium">
+                    {new Date(selectedUser.registerDate).toLocaleDateString()}
+                  </p>
+                </div>
+
+                {/* Balance */}
+                <div>
+                  <p className="text-sm text-gray-500">Balance</p>
+                  <p className="font-medium text-green-600">
+                    {selectedUser.balance} Units
+                  </p>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <p className="text-sm text-gray-500">Status</p>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      selectedUser.isAccepted
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {selectedUser.isAccepted ? "Accepted" : "Pending"}
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Date Filter Section */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-2 bg-white border rounded-lg">
-              {/* Quick Filter Buttons */}
-              <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-                <button
-                  onClick={() => {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    setStartDate(today);
-                    setEndDate(new Date());
-                  }}
-                  className="px-3 py-1 rounded border hover:bg-gray-50 text-sm"
-                >
-                  Today
-                </button>
-                <button
-                  onClick={() => {
-                    const date = new Date();
-                    date.setDate(date.getDate() - 3);
-                    setStartDate(date);
-                    setEndDate(new Date());
-                  }}
-                  className="px-3 py-1 rounded border hover:bg-gray-50 text-sm"
-                >
-                  Last 3 Days
-                </button>
-                <button
-                  onClick={() => {
-                    const date = new Date();
-                    date.setDate(date.getDate() - 7);
-                    setStartDate(date);
-                    setEndDate(new Date());
-                  }}
-                  className="px-3 py-1 rounded border hover:bg-gray-50 text-sm"
-                >
-                  Last 7 Days
-                </button>
-              </div>
-
-              {/* Custom Date Range */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <span className="text-sm whitespace-nowrap">From:</span>
-                  <input
-                    type="date"
-                    value={
-                      startDate ? startDate.toISOString().split("T")[0] : ""
-                    }
-                    onChange={(e) => setStartDate(new Date(e.target.value))}
-                    className="px-2 py-1 border rounded text-sm w-full sm:w-auto"
-                  />
-                </div>
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <span className="text-sm whitespace-nowrap">To:</span>
-                  <input
-                    type="date"
-                    value={endDate ? endDate.toISOString().split("T")[0] : ""}
-                    onChange={(e) => setEndDate(new Date(e.target.value))}
-                    className="px-2 py-1 border rounded text-sm w-full sm:w-auto"
-                  />
-                </div>
-              </div>
-
-              {/* Clear Button */}
-              <button
-                onClick={() => {
-                  setStartDate(null);
-                  setEndDate(null);
-                }}
-                className="px-3 py-1 text-sm text-gray-500 hover:text-gray-700 w-full sm:w-auto text-center"
-              >
-                Clear Filters
-              </button>
-            </div>
-
-            {/* Transaction History */}
+            {/* Transaction History Section */}
             <div>
               <h3 className="text-lg font-semibold mb-4">
                 Transaction History
               </h3>
               {selectedUser.history && selectedUser.history.length > 0 ? (
                 <div className="space-y-4">
+                  {/* Show only the last 5 transactions by default */}
                   {selectedUser.history
-                    .filter((event) => {
-                      if (!startDate && !endDate) return true;
-                      const eventDate = new Date(event.date);
-                      if (startDate && endDate) {
-                        return eventDate >= startDate && eventDate <= endDate;
-                      }
-                      if (startDate) {
-                        return eventDate >= startDate;
-                      }
-                      if (endDate) {
-                        return eventDate <= endDate;
-                      }
-                      return true;
-                    })
+                    .slice(0, 5) // Limit to 5 entries for performance
                     .map((event, index) => (
                       <div
                         key={index}
                         className="border rounded-lg p-4 hover:bg-gray-50"
                       >
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                          {/* Event Type and Date */}
                           <div className="flex flex-wrap gap-2">
                             <span
                               className={`px-2 py-1 rounded-full text-xs ${
@@ -664,16 +600,20 @@ if (searchTerm) {
                               {event.type.charAt(0).toUpperCase() +
                                 event.type.slice(1)}
                             </span>
-                            {event.adminAction && (
-                              <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
-                                {event.adminAction}
-                              </span>
-                            )}
+                            <span className="text-sm text-gray-500">
+                              {new Date(event.date).toLocaleString()}
+                            </span>
                           </div>
-                          <span className="text-sm text-gray-500 w-full sm:w-auto text-left sm:text-right">
-                            {new Date(event.date).toLocaleString()}
-                          </span>
+
+                          {/* Admin Action (if applicable) */}
+                          {event.adminAction && (
+                            <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
+                              {event.adminAction}
+                            </span>
+                          )}
                         </div>
+
+                        {/* Event Details */}
                         <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {event.amount && (
                             <p className="font-medium">
@@ -696,11 +636,23 @@ if (searchTerm) {
                         </div>
                       </div>
                     ))}
+
+                  {/* Show a "Load More" button if there are more than 5 entries */}
+                  {selectedUser.history.length > 5 && (
+                    <button
+                      onClick={() => {
+                        // Load more logic here (e.g., fetch additional history entries)
+                      }}
+                      className="w-full py-2 text-center text-blue-500 hover:bg-blue-50 rounded-lg"
+                    >
+                      Load More
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-8">
                   <p className="text-gray-500">
-                    No transaction history available for the selected period.
+                    No transaction history available.
                   </p>
                 </div>
               )}
@@ -708,6 +660,7 @@ if (searchTerm) {
           </div>
         </Modal>
       )}
+
       {/* Delete Confirmation Modal */}
       {showDeleteModal && userToDelete && (
         <DeleteConfirmationModal
