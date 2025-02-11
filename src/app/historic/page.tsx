@@ -50,7 +50,7 @@ interface UpdatedFields {
 
 interface AdminHistoryEntry {
   action: "create" | "update" | "delete" | "Recharge" | "Discount";
-  date: Date;
+    date: Date;
   adminId?: string;
   entity?:
     | "product"

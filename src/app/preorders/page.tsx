@@ -267,7 +267,7 @@ export default function PreOrdersPage() {
                       </span>
                     </div>
                     <p className="text-sm text-gray-600 mt-1">
-                      {preOrder.fullName || preOrder.userName} ||{" "}
+                      {preOrder.userTelegramId || preOrder.userName} ||{" "}
                       {new Date(preOrder.date).toLocaleString()}
                     </p>
                   </div>
@@ -307,7 +307,7 @@ export default function PreOrdersPage() {
                       <div className="space-y-2 text-sm text-gray-600">
                         <p>
                           <strong>Full Name:</strong>{" "}
-                          {preOrder.fullName || preOrder.userName}
+                          {preOrder.fullName || preOrder.userName || preOrder.userTelegramId}
                         </p>
                         <p>
                           <strong>Product Price:</strong> $
