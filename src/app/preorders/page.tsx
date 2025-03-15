@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { apiClient } from "../utils/apiClient";
+import { FaEye, FaCheck, FaTimes } from "react-icons/fa";
 
 interface PreOrder {
   _id: string;
@@ -21,6 +22,12 @@ interface PreOrder {
   clientMessageData?: string;
 }
 
+interface User {
+  _id: string;
+  fullName?: string;
+  username: string;
+}
+
 export default function PreOrdersPage() {
   const [preOrders, setPreOrders] = useState<PreOrder[]>([]);
   const [filteredPreOrders, setFilteredPreOrders] = useState<PreOrder[]>([]);
@@ -35,6 +42,8 @@ export default function PreOrdersPage() {
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [showPreOrderDetailsModal, setShowPreOrderDetailsModal] = useState(false);
+  const [usersMap, setUsersMap] = useState<{ [userId: string]: User | null }>({});
   const itemsPerPage = 10; // Limit to 10 entries per page
 
   useEffect(() => {
@@ -79,6 +88,22 @@ export default function PreOrdersPage() {
       setError(null);
       const response = await apiClient.get("/preorders");
       setPreOrders(response);
+
+      const userIds = Array.from(new Set(response.map((p: PreOrder) => p.userId)));
+      const usersData = await Promise.all(
+        userIds.map(async (id) => {
+          try {
+            return { id, data: await apiClient.get(`/users/${id}`) };
+          } catch {
+            return { id, data: null };
+          }
+        })
+      ) as Array<{ id: string; data: User | null }>;
+      const map: { [key: string]: User | null } = {};
+      usersData.forEach(u => {
+        map[u.id] = u.data;
+      });
+      setUsersMap(map);
     } catch (error: any) {
       setError("Error fetching pre-orders. Please try again later.");
       console.error("Error fetching pre-orders:", error.message);
@@ -93,27 +118,46 @@ export default function PreOrdersPage() {
     emailPassword?: string
   ) => {
     try {
+      setIsLoading(true);
       setError(null);
       await apiClient.put(`/preorders/${preOrderId}/status`, {
         status,
         emailPassword,
       });
       await fetchPreOrders();
+      setIsLoading(false);
     } catch (error: any) {
       setError(`Error updating pre-order status to ${status}.`);
       console.error(
         `Error updating pre-order status to ${status}:`,
         error.message
       );
+      setIsLoading(false);
     }
   };
-  const handleActionConfirm = () => {
+
+  const handleFulfill = (preOrder: PreOrder) => {
+    setSelectedPreOrder(preOrder);
+    setAction("fulfilled");
+  };
+
+  const handleCancel = (preOrder: PreOrder) => {
+    setSelectedPreOrder(preOrder);
+    setAction("canceled");
+  };
+
+  const handleViewDetails = (preOrder: PreOrder) => {
+    setSelectedPreOrder(preOrder);
+    setShowPreOrderDetailsModal(true);
+  };
+
+  const handleActionConfirm = async () => {
     if (selectedPreOrder && action) {
       if (action === "fulfilled" && !emailPassword) {
         setError("Email and password are required for fulfillment.");
         return;
       }
-      updatePreOrderStatus(
+      await updatePreOrderStatus(
         selectedPreOrder._id,
         action,
         action === "fulfilled" ? emailPassword : undefined
@@ -241,115 +285,102 @@ export default function PreOrdersPage() {
             No pre-orders found.
           </div>
         ) : (
-          <div className="space-y-4 p-6">
+          <div className="space-y-4 p-4">
             {paginatedOrders.map((preOrder) => (
               <div
                 key={preOrder._id}
-                className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
+                className="bg-white rounded-md shadow p-4 hover:shadow-lg transition-shadow"
               >
-                {/* Order Summary */}
-                <div
-                  className="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 cursor-pointer"
-                  onClick={() => toggleOrderExpand(preOrder._id)}
-                >
-                  <div className="flex-grow">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-bold text-gray-800">
-                        {preOrder.productName}
-                      </h3>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                          preOrder.status
-                        )}`}
-                      >
-                        {preOrder.status.charAt(0).toUpperCase() +
-                          preOrder.status.slice(1)}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600 mt-1">
-                      {preOrder.userTelegramId || preOrder.userName} ||{" "}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                  <div 
+                    onClick={() => toggleOrderExpand(preOrder._id)}
+                    className="cursor-pointer flex-grow space-y-1"
+                  >
+                    <p className="text-sm font-semibold">
+                      {preOrder.productName} - ${preOrder.productPrice}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      {usersMap[preOrder.userId]?.fullName ||
+                        usersMap[preOrder.userId]?.username ||
+                        preOrder.userName}
+                    </p>
+                    <p className="text-xs text-gray-400">
                       {new Date(preOrder.date).toLocaleString()}
                     </p>
                   </div>
-                  {preOrder.status === "pending" && (
+
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-2 py-1 text-xs rounded-full ${getStatusColor(
+                        preOrder.status
+                      )}`}
+                    >
+                      {preOrder.status}
+                    </span>
+                    
                     <div className="flex gap-2">
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedPreOrder(preOrder);
-                          setAction("fulfilled");
-                        }}
-                        className="bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600 transition"
+                        onClick={() => handleViewDetails(preOrder)}
+                        className="p-2 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition"
+                        title="View Details"
                       >
-                        Fulfill
+                        <FaEye size={14} />
                       </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedPreOrder(preOrder);
-                          setAction("canceled");
-                        }}
-                        className="bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600 transition"
-                      >
-                        Cancel
-                      </button>
+                      
+                      {preOrder.status === "pending" && (
+                        <>
+                          <button
+                            onClick={() => handleFulfill(preOrder)}
+                            className="p-2 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition"
+                            title="Fulfill Order"
+                          >
+                            <FaCheck size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleCancel(preOrder)}
+                            className="p-2 bg-red-100 text-red-700 rounded-full hover:bg-red-200 transition"
+                            title="Cancel Order"
+                          >
+                            <FaTimes size={14} />
+                          </button>
+                        </>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
 
-                {/* Expanded Order Details */}
                 {expandedOrders.has(preOrder._id) && (
-                  <div className="p-6 bg-gray-50 border-t grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="font-semibold mb-2 text-gray-700">
-                        Order Details
-                      </h4>
-                      <div className="space-y-2 text-sm text-gray-600">
+                  <div className="mt-4 bg-gray-50 p-3 rounded">
+                    <p className="text-sm">
+                      <strong>Message:</strong> {preOrder.message || "N/A"}
+                    </p>
+                    <div className="space-y-2 text-sm text-gray-600">
+                      {preOrder.clientMessage && (
                         <p>
-                          <strong>Full Name:</strong>{" "}
-                          {preOrder.fullName || preOrder.userName || preOrder.userTelegramId}
+                          <strong>Client Message:</strong>{" "}
+                          {preOrder.clientMessage}
                         </p>
+                      )}
+                      {preOrder.clientMessageData && (
                         <p>
-                          <strong>Product Price:</strong> $
-                          {preOrder.productPrice.toFixed(2)}
+                          <strong>Client Message Data:</strong>{" "}
+                          {preOrder.clientMessageData}
                         </p>
+                      )}
+                      {preOrder.fulfillmentDate && (
                         <p>
-                          <strong>Order Date:</strong>{" "}
-                          {new Date(preOrder.date).toLocaleString()}
+                          <strong>Fulfillment Date:</strong>{" "}
+                          {new Date(
+                            preOrder.fulfillmentDate
+                          ).toLocaleString()}
                         </p>
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-2 text-gray-700">
-                        Additional Information
-                      </h4>
-                      <div className="space-y-2 text-sm text-gray-600">
-                        {preOrder.message && (
-                          <p>
-                            <strong>Message:</strong> {preOrder.message}
-                          </p>
-                        )}
-                        {preOrder.clientMessage && (
-                          <p>
-                            <strong>Client Message:</strong>{" "}
-                            {preOrder.clientMessage}
-                          </p>
-                        )}
-                        {preOrder.clientMessageData && (
-                          <p>
-                            <strong>Client Message Data:</strong>{" "}
-                            {preOrder.clientMessageData}
-                          </p>
-                        )}
-                        {preOrder.fulfillmentDate && (
-                          <p>
-                            <strong>Fulfillment Date:</strong>{" "}
-                            {new Date(
-                              preOrder.fulfillmentDate
-                            ).toLocaleString()}
-                          </p>
-                        )}
-                      </div>
+                      )}
+                      {preOrder.fulfillmentDetails && (
+                        <p>
+                          <strong>Fulfillment Details:</strong>{" "}
+                          {preOrder.fulfillmentDetails}
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -384,8 +415,8 @@ export default function PreOrdersPage() {
         )}
       </div>
 
-      {/* Action Confirmation Modal */}
-      {selectedPreOrder && action && (
+  {/* Action Confirmation Modal */}
+  {selectedPreOrder && action && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="p-6">
@@ -405,20 +436,28 @@ export default function PreOrdersPage() {
                 </span>
                 ?
               </p>
+              
               {action === "fulfilled" && (
-                <textarea
-                  placeholder="Enter email and password"
-                  value={emailPassword}
-                  onChange={(e) => setEmailPassword(e.target.value)}
-                  className="w-full border rounded p-2 mb-4"
-                  rows={3}
-                />
+                <div className="mb-4">
+                  <label className="block mb-2 text-sm font-medium">
+                    Email and Password (required for fulfillment)
+                  </label>
+                  <textarea
+                    placeholder="Enter email and password"
+                    value={emailPassword}
+                    onChange={(e) => setEmailPassword(e.target.value)}
+                    className="w-full border rounded p-2"
+                    rows={3}
+                  />
+                </div>
               )}
+              
               <div className="flex justify-end space-x-2">
                 <button
                   onClick={() => {
                     setSelectedPreOrder(null);
                     setAction(null);
+                    setEmailPassword("");
                   }}
                   className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
                 >
@@ -426,11 +465,115 @@ export default function PreOrdersPage() {
                 </button>
                 <button
                   onClick={handleActionConfirm}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                  className={`px-4 py-2 text-white rounded-lg transition ${
+                    action === "fulfilled" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"
+                  }`}
                 >
-                  Confirm
+                  Confirm {action === "fulfilled" ? "Fulfillment" : "Cancellation"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pre-Order Details Modal */}
+      {showPreOrderDetailsModal && selectedPreOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-auto">
+            <div className="p-6 border-b flex justify-between items-center">
+              <h2 className="text-xl font-bold">Pre-Order Details</h2>
+              <button
+                onClick={() => setShowPreOrderDetailsModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="flex justify-between items-center">
+                <p className="text-lg font-semibold">{selectedPreOrder.productName}</p>
+                <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(selectedPreOrder.status)}`}>
+                  {selectedPreOrder.status}
+                </span>
+              </div>
+              
+              <div className="border-t pt-4">
+                <p className="text-sm">
+                  <strong>Price:</strong> ${selectedPreOrder.productPrice}
+                </p>
+                <p className="text-sm">
+                  <strong>Order Date:</strong> {new Date(selectedPreOrder.date).toLocaleString()}
+                </p>
+                {selectedPreOrder.fulfillmentDate && (
+                  <p className="text-sm">
+                    <strong>Fulfillment Date:</strong> {new Date(selectedPreOrder.fulfillmentDate).toLocaleString()}
+                  </p>
+                )}
+              </div>
+              
+              <div className="border-t pt-4">
+                <p className="text-sm">
+                  <strong>Customer:</strong> {selectedPreOrder.fullName || selectedPreOrder.userName}
+                </p>
+                {selectedPreOrder.userTelegramId && (
+                  <p className="text-sm">
+                    <strong>Telegram ID:</strong> {selectedPreOrder.userTelegramId}
+                  </p>
+                )}
+              </div>
+              
+              <div className="border-t pt-4">
+                <p className="text-sm">
+                  <strong>Message:</strong> {selectedPreOrder.message || "N/A"}
+                </p>
+                {selectedPreOrder.clientMessage && (
+                  <p className="text-sm">
+                    <strong>Client Message:</strong> {selectedPreOrder.clientMessage}
+                  </p>
+                )}
+                {selectedPreOrder.clientMessageData && (
+                  <p className="text-sm">
+                    <strong>Client Message Data:</strong> {selectedPreOrder.clientMessageData}
+                  </p>
+                )}
+                {selectedPreOrder.fulfillmentDetails && (
+                  <p className="text-sm">
+                    <strong>Fulfillment Details:</strong> {selectedPreOrder.fulfillmentDetails}
+                  </p>
+                )}
+              </div>
+              
+              {selectedPreOrder.status === "pending" && (
+                <div className="border-t pt-4 flex justify-center gap-4">
+                  <button
+                    onClick={() => {
+                      setShowPreOrderDetailsModal(false);
+                      handleFulfill(selectedPreOrder);
+                    }}
+                    className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition flex items-center gap-2"
+                  >
+                    <FaCheck size={14} /> Fulfill Order
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowPreOrderDetailsModal(false);
+                      handleCancel(selectedPreOrder);
+                    }}
+                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition flex items-center gap-2"
+                  >
+                    <FaTimes size={14} /> Cancel Order
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="p-6 border-t flex justify-end">
+              <button
+                onClick={() => setShowPreOrderDetailsModal(false)}
+                className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

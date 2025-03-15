@@ -622,10 +622,10 @@ export default function ProductsPage() {
 
   const handleAddEmail = (e: React.FormEvent) => {
     e.preventDefault();
-    const validatedEmails = validateEmails(newEmail);
+    const emailLines = newEmail.split("\n").map((line) => line.trim()).filter((line) => line);
 
-    if (validatedEmails.length > 0) {
-      setEmailsToAdd(validatedEmails);
+    if (emailLines.length > 0) {
+      setEmailsToAdd(emailLines);
       setShowEmailConfirmModal(true);
     } else {
       showAlert("warning", "No valid new emails to add");
@@ -1010,10 +1010,9 @@ export default function ProductsPage() {
 
             <div>
               <label className="block mb-2 font-medium">Emails *</label>
-              <input
-                type="text"
+              <textarea
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter emails separated by commas"
+                placeholder="Enter emails, one per line (e.g., email@domain.com:password)"
                 value={newProductData.emailsText}
                 onChange={(e) =>
                   setNewProductData({
@@ -1224,10 +1223,9 @@ export default function ProductsPage() {
                     Add New Emails
                   </label>
                   <form onSubmit={handleAddEmail} className="flex gap-2">
-                    <input
-                      type="text"
+                    <textarea
                       className="flex-1 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="Enter emails (comma-separated)"
+                      placeholder="Enter emails, one per line (e.g., email@domain.com:password)"
                       value={newEmail}
                       onChange={(e) => setNewEmail(e.target.value)}
                     />

@@ -11,7 +11,9 @@ import {
   FaPlusCircle,
   FaTrash,
   FaSort,
+  FaEdit,
 } from "react-icons/fa";
+import UserDetailsDialog from "@/components/UserDetailsDialog";
 
 // Define types
 interface UserEvent {
@@ -27,10 +29,10 @@ interface UserEvent {
   adminAction?: "Recharge" | "Discount";
 }
 
-interface User {
+export interface User {
   _id: string;
-  telegramId: string;
-  chatId: string;
+  telegramId?: string;
+  chatId?: string;
   username: string;
   name: string;
   fullName?: string;
@@ -129,6 +131,7 @@ export default function UsersPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showAddBalanceModal, setShowAddBalanceModal] = useState(false);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState<
     "all" | "accepted" | "pending"
   >("all");
@@ -242,6 +245,12 @@ export default function UsersPage() {
     } finally {
       setIsUpdating(false);
     }
+  };
+
+  const handleUserUpdate = (updatedUser: User) => {
+    setUsers((prev) =>
+      prev.map((u) => (u._id === updatedUser._id ? updatedUser : u))
+    );
   };
 
   // Handle sorting
@@ -396,6 +405,16 @@ export default function UsersPage() {
                       title="Delete User"
                     >
                       <FaTrash className="text-xl" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedUser(user);
+                        setShowEditUserModal(true);
+                      }}
+                      className="p-2 rounded-full text-purple-500 hover:bg-purple-100 transition-colors"
+                      title="Edit User"
+                    >
+                      <FaEdit className="text-xl" />
                     </button>
                   </div>
                 </div>
@@ -674,6 +693,14 @@ export default function UsersPage() {
             setShowDeleteModal(false);
             setUserToDelete(null);
           }}
+        />
+      )}
+      {showEditUserModal && selectedUser && (
+        <UserDetailsDialog
+          user={selectedUser}
+          isOpen={showEditUserModal}
+          onClose={() => setShowEditUserModal(false)}
+          onUpdate={handleUserUpdate}
         />
       )}
     </div>
