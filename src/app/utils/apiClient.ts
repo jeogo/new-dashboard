@@ -1,7 +1,7 @@
 // src/utils/apiClient.ts
 
 const BASE_URL =
-  process.env.NEXT_PUBLIC_BASE_URL || "https://storebot-b8de.onrender.com";
+  process.env.NEXT_PUBLIC_BASE_URL || "https://storebot-msp6.onrender.com";
 
 type ApiResponse<T = any> = {
   data?: T;
